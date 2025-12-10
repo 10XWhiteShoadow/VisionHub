@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Home, Scan, Hand, Package, Activity, FileText, Github } from "lucide-react";
+import { Home, Scan, Hand, Package, Activity, FileText, Github, UserCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LayoutProps {
@@ -15,6 +15,7 @@ const navItems = [
   { path: "/object-detection", icon: Package, label: "Objects" },
   { path: "/pose-estimation", icon: Activity, label: "Pose" },
   { path: "/ocr", icon: FileText, label: "OCR" },
+  { path: "/attendance", icon: UserCheck, label: "Attendance" },
 ];
 
 /**

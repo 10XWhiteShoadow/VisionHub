@@ -1,4 +1,4 @@
-import { Scan, Hand, Package, Activity, FileText, Sparkles, Zap, Shield, ChevronDown } from "lucide-react";
+import { Scan, Hand, Package, Activity, FileText, Sparkles, Zap, Shield, ChevronDown, UserCheck } from "lucide-react";
 import { FeatureCard } from "@/components/FeatureCard";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -38,6 +38,13 @@ const features = [
     icon: FileText,
     path: "/ocr",
     color: "orange" as const,
+  },
+  {
+    title: "Attendance Management",
+    description: "Smart attendance system using face recognition. Track students and sync to Google Sheets.",
+    icon: UserCheck,
+    path: "/attendance",
+    color: "cyan" as const,
   },
 ];
 
