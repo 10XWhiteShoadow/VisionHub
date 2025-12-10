@@ -20,7 +20,10 @@ import {
   Send,
   Loader2,
   UserPlus,
-  Sparkles
+  Sparkles,
+  Camera,
+  X,
+  Scan
 } from "lucide-react";
 
 interface Student {
@@ -57,6 +60,11 @@ const Attendance = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [detectedFaces, setDetectedFaces] = useState(0);
   const [lastDetection, setLastDetection] = useState<string | null>(null);
+  
+  // New states for capture modal
+  const [showCaptureModal, setShowCaptureModal] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
 
   // Load students from localStorage
   useEffect(() => {
@@ -119,23 +127,59 @@ const Attendance = () => {
         const bbox = detection.boundingBox;
         if (!bbox) return;
 
-        // Draw neon bounding box
+        // Draw animated neon bounding box
         ctx.strokeStyle = "#00ff88";
         ctx.lineWidth = 3;
         ctx.shadowColor = "#00ff88";
-        ctx.shadowBlur = 15;
-        ctx.strokeRect(bbox.originX, bbox.originY, bbox.width, bbox.height);
+        ctx.shadowBlur = 20;
+        
+        // Animated corners instead of full rectangle
+        const cornerLength = 20;
+        
+        // Top-left corner
+        ctx.beginPath();
+        ctx.moveTo(bbox.originX, bbox.originY + cornerLength);
+        ctx.lineTo(bbox.originX, bbox.originY);
+        ctx.lineTo(bbox.originX + cornerLength, bbox.originY);
+        ctx.stroke();
+        
+        // Top-right corner
+        ctx.beginPath();
+        ctx.moveTo(bbox.originX + bbox.width - cornerLength, bbox.originY);
+        ctx.lineTo(bbox.originX + bbox.width, bbox.originY);
+        ctx.lineTo(bbox.originX + bbox.width, bbox.originY + cornerLength);
+        ctx.stroke();
+        
+        // Bottom-left corner
+        ctx.beginPath();
+        ctx.moveTo(bbox.originX, bbox.originY + bbox.height - cornerLength);
+        ctx.lineTo(bbox.originX, bbox.originY + bbox.height);
+        ctx.lineTo(bbox.originX + cornerLength, bbox.originY + bbox.height);
+        ctx.stroke();
+        
+        // Bottom-right corner
+        ctx.beginPath();
+        ctx.moveTo(bbox.originX + bbox.width - cornerLength, bbox.originY + bbox.height);
+        ctx.lineTo(bbox.originX + bbox.width, bbox.originY + bbox.height);
+        ctx.lineTo(bbox.originX + bbox.width, bbox.originY + bbox.height - cornerLength);
+        ctx.stroke();
 
-        // Draw confidence label
+        // Draw confidence label with background
         const confidence = (detection.categories[0]?.score || 0) * 100;
+        const label = `Face ${index + 1} • ${confidence.toFixed(0)}%`;
+        ctx.font = "bold 14px 'Space Grotesk', sans-serif";
+        const textWidth = ctx.measureText(label).width;
+        
+        // Label background
+        ctx.fillStyle = "rgba(0, 255, 136, 0.2)";
+        ctx.shadowBlur = 0;
+        ctx.fillRect(bbox.originX, bbox.originY - 28, textWidth + 16, 24);
+        
+        // Label text
         ctx.fillStyle = "#00ff88";
-        ctx.font = "bold 14px 'Space Grotesk'";
+        ctx.shadowColor = "#00ff88";
         ctx.shadowBlur = 10;
-        ctx.fillText(
-          `Face ${index + 1} (${confidence.toFixed(0)}%)`,
-          bbox.originX,
-          bbox.originY - 10
-        );
+        ctx.fillText(label, bbox.originX + 8, bbox.originY - 10);
       });
     } catch (error) {
       console.error("Detection error:", error);
@@ -155,6 +199,23 @@ const Attendance = () => {
 
     return () => cancelAnimationFrame(animationId);
   }, [isProcessing, faceDetector, processFrame]);
+
+  // Capture face and show modal
+  const captureFace = () => {
+    if (!webcamRef.current || detectedFaces === 0) return;
+    
+    setIsCapturing(true);
+    
+    // Add a brief delay for visual feedback
+    setTimeout(() => {
+      const imageSrc = webcamRef.current?.getScreenshot();
+      if (imageSrc) {
+        setCapturedImage(imageSrc);
+        setShowCaptureModal(true);
+      }
+      setIsCapturing(false);
+    }, 200);
+  };
 
   // Mark student as present
   const markPresent = (student: Student) => {
@@ -181,6 +242,9 @@ const Attendance = () => {
     });
 
     setLastDetection(student.name);
+    setShowCaptureModal(false);
+    setCapturedImage(null);
+    
     toast({
       title: "Attendance Marked! ✓",
       description: `${student.name} marked present at ${record.timestamp}`,
@@ -201,19 +265,6 @@ const Attendance = () => {
     setIsSubmitting(true);
 
     try {
-      // For Google Sheets integration, we need a Google Apps Script Web App
-      // This is a demo - in production, you'd deploy a script like:
-      /*
-        function doPost(e) {
-          const sheet = SpreadsheetApp.openById('125iuh-wPn_XFNfmjufOkB0anM3wGG3_9Cq5X_IxlICc').getActiveSheet();
-          const data = JSON.parse(e.postData.contents);
-          data.forEach(record => {
-            sheet.appendRow([record.date, record.rollNo, record.studentName, record.timestamp, record.status]);
-          });
-          return ContentService.createTextOutput(JSON.stringify({success: true}));
-        }
-      */
-      
       // Simulating the submission for demo
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
@@ -243,6 +294,11 @@ const Attendance = () => {
     month: "long",
     day: "numeric",
   });
+
+  // Get unmarked students
+  const unmarkedStudents = students.filter(
+    (s) => !todayAttendance.some((r) => r.studentId === s.id)
+  );
 
   return (
     <Layout>
@@ -280,24 +336,65 @@ const Attendance = () => {
                         className="w-full rounded-xl"
                         videoConstraints={{ facingMode: "user" }}
                         onUserMedia={() => setIsProcessing(true)}
+                        screenshotFormat="image/jpeg"
                       />
                       <canvas
                         ref={canvasRef}
                         className="absolute inset-0 w-full h-full pointer-events-none"
                       />
                       
+                      {/* Scanning overlay animation */}
+                      {isProcessing && detectedFaces === 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-center">
+                            <Scan className="w-16 h-16 text-neon-cyan/50 animate-pulse mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">Scanning for faces...</p>
+                          </div>
+                        </div>
+                      )}
+                      
                       {/* Live Stats Overlay */}
                       <div className="absolute top-4 left-4 flex gap-2">
-                        <div className="px-3 py-1.5 rounded-full bg-background/80 backdrop-blur-sm border border-neon-cyan/30">
-                          <span className="text-sm text-neon-cyan font-mono">
-                            {detectedFaces} face{detectedFaces !== 1 ? "s" : ""} detected
+                        <div className={`px-3 py-1.5 rounded-full backdrop-blur-sm border transition-all duration-300 ${
+                          detectedFaces > 0 
+                            ? "bg-neon-green/20 border-neon-green/50" 
+                            : "bg-background/80 border-neon-cyan/30"
+                        }`}>
+                          <span className={`text-sm font-mono ${
+                            detectedFaces > 0 ? "text-neon-green" : "text-neon-cyan"
+                          }`}>
+                            {detectedFaces > 0 ? `✓ ${detectedFaces} face${detectedFaces !== 1 ? "s" : ""} detected` : "No faces detected"}
                           </span>
                         </div>
                       </div>
 
+                      {/* Capture Button - Shows when face detected */}
+                      {detectedFaces > 0 && students.length > 0 && (
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 animate-fade-in-up">
+                          <Button
+                            onClick={captureFace}
+                            disabled={isCapturing}
+                            size="lg"
+                            className="gap-3 h-14 px-8 text-lg font-semibold bg-gradient-to-r from-neon-green to-neon-cyan text-background hover:opacity-90 shadow-lg shadow-neon-green/30 animate-pulse-glow"
+                          >
+                            {isCapturing ? (
+                              <>
+                                <Loader2 className="w-6 h-6 animate-spin" />
+                                Capturing...
+                              </>
+                            ) : (
+                              <>
+                                <Camera className="w-6 h-6" />
+                                Capture & Mark Present
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+
                       {lastDetection && (
-                        <div className="absolute bottom-4 left-4 right-4">
-                          <div className="px-4 py-2 rounded-lg bg-neon-green/20 border border-neon-green/50 backdrop-blur-sm animate-fade-in">
+                        <div className="absolute bottom-4 left-4 right-4 pointer-events-none">
+                          <div className="px-4 py-2 rounded-lg bg-neon-green/20 border border-neon-green/50 backdrop-blur-sm animate-fade-in inline-block">
                             <span className="text-neon-green font-medium">
                               ✓ Last marked: {lastDetection}
                             </span>
@@ -306,12 +403,28 @@ const Attendance = () => {
                       )}
                     </div>
 
+                    {/* Instructions */}
+                    {students.length > 0 && (
+                      <div className="bg-card/30 rounded-lg p-4 border border-border/50">
+                        <h4 className="font-medium mb-2 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-neon-yellow" />
+                          How to mark attendance:
+                        </h4>
+                        <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                          <li>Position the student's face in the camera</li>
+                          <li>Wait for face detection (green box appears)</li>
+                          <li>Click "Capture & Mark Present" button</li>
+                          <li>Select the student from the list</li>
+                        </ol>
+                      </div>
+                    )}
+
                     {/* Student Quick Select */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                           <Users className="w-5 h-5 text-neon-purple" />
-                          Quick Mark Present
+                          Students ({unmarkedStudents.length} remaining)
                         </h3>
                         <Link to="/attendance/students">
                           <Button variant="outline" size="sm" className="gap-2 hover-lift">
@@ -348,8 +461,8 @@ const Attendance = () => {
                                   animate-fade-in-up hover-lift
                                   ${
                                     isMarked
-                                      ? "bg-neon-green/10 border-neon-green/50"
-                                      : "bg-card/50 border-border hover:border-neon-cyan/50 hover:bg-neon-cyan/5"
+                                      ? "bg-neon-green/10 border-neon-green/50 cursor-default"
+                                      : "bg-card/50 border-border hover:border-neon-cyan/50 hover:bg-neon-cyan/5 cursor-pointer"
                                   }
                                 `}
                                 style={{ animationDelay: `${index * 0.05}s` }}
@@ -359,10 +472,14 @@ const Attendance = () => {
                                     <CheckCircle2 className="w-6 h-6 text-neon-green animate-scale-in" />
                                   </div>
                                 )}
-                                <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-gradient-to-br from-neon-cyan/20 to-neon-purple/20 flex items-center justify-center border border-white/10">
-                                  <span className="text-lg font-bold text-gradient-cyan">
-                                    {student.name.charAt(0).toUpperCase()}
-                                  </span>
+                                <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-gradient-to-br from-neon-cyan/20 to-neon-purple/20 flex items-center justify-center border border-white/10 overflow-hidden">
+                                  {student.imageData ? (
+                                    <img src={student.imageData} alt={student.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span className="text-lg font-bold text-gradient-cyan">
+                                      {student.name.charAt(0).toUpperCase()}
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="text-sm font-medium truncate">{student.name}</p>
                                 <p className="text-xs text-muted-foreground">{student.rollNo}</p>
@@ -399,6 +516,22 @@ const Attendance = () => {
                     <p className="text-xs text-muted-foreground">Absent</p>
                   </div>
                 </div>
+                
+                {/* Progress bar */}
+                {students.length > 0 && (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                      <span>Attendance Progress</span>
+                      <span>{Math.round((todayAttendance.length / students.length) * 100)}%</span>
+                    </div>
+                    <div className="h-2 bg-background rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-neon-green to-neon-cyan transition-all duration-500"
+                        style={{ width: `${(todayAttendance.length / students.length) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </Card>
 
               {/* Attendance List */}
@@ -463,6 +596,78 @@ const Attendance = () => {
             </div>
           </div>
         </div>
+
+        {/* Capture Modal */}
+        {showCaptureModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+            <div
+              className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+              onClick={() => {
+                setShowCaptureModal(false);
+                setCapturedImage(null);
+              }}
+            />
+            <Card className="relative z-10 w-full max-w-lg glass-card p-6 animate-scale-in-bounce">
+              {/* Close Button */}
+              <button
+                onClick={() => {
+                  setShowCaptureModal(false);
+                  setCapturedImage(null);
+                }}
+                className="absolute top-4 right-4 p-2 rounded-lg hover:bg-muted transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                <Camera className="w-6 h-6 text-neon-green" />
+                Select Student
+              </h2>
+
+              {/* Captured Image */}
+              {capturedImage && (
+                <div className="mb-4 rounded-xl overflow-hidden border-2 border-neon-green/50">
+                  <img src={capturedImage} alt="Captured face" className="w-full" />
+                </div>
+              )}
+
+              <p className="text-muted-foreground mb-4">
+                Who is this? Select the student to mark present:
+              </p>
+
+              {/* Student Selection */}
+              <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto custom-scrollbar">
+                {unmarkedStudents.length === 0 ? (
+                  <p className="col-span-2 text-center text-muted-foreground py-4">
+                    All students are already marked present!
+                  </p>
+                ) : (
+                  unmarkedStudents.map((student) => (
+                    <button
+                      key={student.id}
+                      onClick={() => markPresent(student)}
+                      className="flex items-center gap-3 p-3 rounded-xl border-2 border-border bg-card/50 hover:border-neon-green/50 hover:bg-neon-green/5 transition-all duration-300 hover-lift"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-neon-cyan/20 to-neon-purple/20 flex items-center justify-center border border-white/10 flex-shrink-0 overflow-hidden">
+                        {student.imageData ? (
+                          <img src={student.imageData} alt={student.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-sm font-bold text-gradient-cyan">
+                            {student.name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-medium">{student.name}</p>
+                        <p className="text-xs text-muted-foreground">{student.rollNo}</p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
     </Layout>
   );
