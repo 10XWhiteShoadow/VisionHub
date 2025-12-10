@@ -10,6 +10,8 @@ import HandGesture from "./pages/HandGesture";
 import ObjectDetection from "./pages/ObjectDetection";
 import PoseEstimation from "./pages/PoseEstimation";
 import OCR from "./pages/OCR";
+import Attendance from "./pages/Attendance";
+import StudentManagement from "./pages/StudentManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +41,8 @@ const App = () => (
           <Route path="/object-detection" element={<ObjectDetection />} />
           <Route path="/pose-estimation" element={<PoseEstimation />} />
           <Route path="/ocr" element={<OCR />} />
+          <Route path="/attendance" element={<Attendance />} />
+          <Route path="/attendance/students" element={<StudentManagement />} />
           {/* Catch-all 404 route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
