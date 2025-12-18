@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Scan, Play, Pause, RefreshCw } from "lucide-react";
 import { FilesetResolver, FaceDetector } from "@mediapipe/tasks-vision";
 
-// Emotion labels with weights for stable detection
-const EMOTIONS = ["Happy", "Neutral", "Surprised", "Sad", "Focused"] as const;
+// Emotion labels
+const EMOTIONS = ["Happy", "Neutral", "Surprised", "Calm", "Focused"] as const;
 type Emotion = typeof EMOTIONS[number];
 
 /**
@@ -34,6 +34,8 @@ export default function FaceDetection() {
   // Stabilization refs
   const emotionHistoryRef = useRef<Emotion[]>([]);
   const lastEmotionUpdateRef = useRef<number>(0);
+  const prevFaceMetricsRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  const movementHistoryRef = useRef<number[]>([]);
   const faceCountHistoryRef = useRef<number[]>([]);
   const lastFacePositionRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -72,39 +74,71 @@ export default function FaceDetection() {
     };
   }, []);
 
-  // Estimate emotion based on face metrics (more stable than random)
+  // Estimate emotion based on face metrics and movement
   const estimateEmotion = useCallback((detection: any): Emotion => {
     const score = detection.categories?.[0]?.score || 0.5;
     const box = detection.boundingBox;
     
     if (!box) return "Neutral";
     
-    // Use face aspect ratio and detection confidence for pseudo-emotion
+    const currentMetrics = { x: box.originX, y: box.originY, w: box.width, h: box.height };
+    const prev = prevFaceMetricsRef.current;
+    
+    // Calculate movement/change
+    let movement = 0;
+    let sizeChange = 0;
+    
+    if (prev) {
+      movement = Math.abs(currentMetrics.x - prev.x) + Math.abs(currentMetrics.y - prev.y);
+      sizeChange = Math.abs(currentMetrics.w - prev.w) + Math.abs(currentMetrics.h - prev.h);
+    }
+    
+    prevFaceMetricsRef.current = currentMetrics;
+    
+    // Track movement history
+    movementHistoryRef.current.push(movement);
+    if (movementHistoryRef.current.length > 30) movementHistoryRef.current.shift();
+    
+    const avgMovement = movementHistoryRef.current.reduce((a, b) => a + b, 0) / movementHistoryRef.current.length;
+    
+    // Use face aspect ratio
     const aspectRatio = box.width / box.height;
     
-    // Create stable emotion based on face characteristics
-    if (score > 0.95 && aspectRatio > 1.1) return "Happy";
-    if (score > 0.9 && aspectRatio < 0.9) return "Surprised";
-    if (score < 0.75) return "Focused";
-    if (aspectRatio > 1.05) return "Happy";
-    return "Neutral";
+    // Determine emotion based on multiple factors
+    // High movement = Surprised or Happy
+    if (avgMovement > 15) return "Surprised";
+    if (avgMovement > 8) return "Happy";
+    
+    // Size changes (leaning in/out)
+    if (sizeChange > 10) return "Focused";
+    
+    // Aspect ratio variations (wider face often = smile)
+    if (aspectRatio > 0.85) return "Happy";
+    if (aspectRatio < 0.7) return "Focused";
+    
+    // High confidence + stable = Calm
+    if (score > 0.9 && avgMovement < 3) return "Calm";
+    
+    // Default based on confidence
+    if (score > 0.85) return "Neutral";
+    return "Focused";
   }, []);
 
-  // Get stabilized emotion (only update every 2 seconds or when confident)
+  // Get stabilized emotion (update every 1 second or when confident change)
   const getStabilizedEmotion = useCallback((newEmotion: Emotion): Emotion => {
     const now = performance.now();
     const history = emotionHistoryRef.current;
     
-    // Add to history (keep last 30 frames ~ 1 second)
+    // Add to history (keep last 20 frames)
     history.push(newEmotion);
-    if (history.length > 30) history.shift();
+    if (history.length > 20) history.shift();
     
-    // Only update displayed emotion every 2 seconds
-    if (now - lastEmotionUpdateRef.current < 2000) {
+    // Only update displayed emotion every 1 second
+    if (now - lastEmotionUpdateRef.current < 1000) {
       return currentEmotion;
     }
     
-    // Find most common emotion in history
+    // Find most common emotion in recent history
     const emotionCounts = history.reduce((acc, e) => {
       acc[e] = (acc[e] || 0) + 1;
       return acc;
@@ -113,9 +147,9 @@ export default function FaceDetection() {
     const dominantEmotion = Object.entries(emotionCounts)
       .sort(([, a], [, b]) => b - a)[0]?.[0] as Emotion || "Neutral";
     
-    // Only update if dominant emotion appears in >40% of frames
+    // Update if dominant emotion appears in >35% of frames
     const dominantCount = emotionCounts[dominantEmotion] || 0;
-    if (dominantCount / history.length > 0.4) {
+    if (dominantCount / history.length > 0.35) {
       lastEmotionUpdateRef.current = now;
       return dominantEmotion;
     }
