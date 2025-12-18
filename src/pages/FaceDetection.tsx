@@ -99,29 +99,27 @@ export default function FaceDetection() {
     movementHistoryRef.current.push(movement);
     if (movementHistoryRef.current.length > 30) movementHistoryRef.current.shift();
     
-    const avgMovement = movementHistoryRef.current.reduce((a, b) => a + b, 0) / movementHistoryRef.current.length;
+    const avgMovement = movementHistoryRef.current.reduce((a, b) => a + b, 0) / 
+      Math.max(movementHistoryRef.current.length, 1);
     
-    // Use face aspect ratio
-    const aspectRatio = box.width / box.height;
+    // Determine emotion based on movement primarily
+    // High movement = Surprised
+    if (avgMovement > 20) return "Surprised";
     
-    // Determine emotion based on multiple factors
-    // High movement = Surprised or Happy
-    if (avgMovement > 15) return "Surprised";
-    if (avgMovement > 8) return "Happy";
+    // Moderate movement = Happy (animated/expressive)
+    if (avgMovement > 10) return "Happy";
     
-    // Size changes (leaning in/out)
-    if (sizeChange > 10) return "Focused";
+    // Size changes (leaning in/out) = Focused
+    if (sizeChange > 15) return "Focused";
     
-    // Aspect ratio variations (wider face often = smile)
-    if (aspectRatio > 0.85) return "Happy";
-    if (aspectRatio < 0.7) return "Focused";
+    // Very still with high confidence = Calm
+    if (avgMovement < 2 && score > 0.9) return "Calm";
     
-    // High confidence + stable = Calm
-    if (score > 0.9 && avgMovement < 3) return "Calm";
+    // Slight movement = Focused (paying attention)
+    if (avgMovement > 4) return "Focused";
     
-    // Default based on confidence
-    if (score > 0.85) return "Neutral";
-    return "Focused";
+    // Default = Neutral
+    return "Neutral";
   }, []);
 
   // Get stabilized emotion (update every 1 second or when confident change)
