@@ -5,18 +5,19 @@ import { StatsDisplay } from "@/components/StatsDisplay";
 import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
 import { Scan, Play, Pause, RefreshCw } from "lucide-react";
-import { FilesetResolver, FaceDetector } from "@mediapipe/tasks-vision";
+import * as faceapi from "face-api.js";
 
 // Emotion labels
-const EMOTIONS = ["Happy", "Neutral", "Surprised", "Calm", "Focused"] as const;
+const EMOTIONS = ["Happy", "Sad", "Angry", "Fearful", "Disgusted", "Surprised", "Neutral"] as const;
 type Emotion = typeof EMOTIONS[number];
 
 /**
  * Face Detection & Emotion Recognition page
- * Uses MediaPipe Face Detector with stabilized emotion estimation
+ * Uses face-api.js for accurate expression-based emotion detection
  */
 export default function FaceDetection() {
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState("Loading models...");
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [faceCount, setFaceCount] = useState(0);
@@ -26,46 +27,43 @@ export default function FaceDetection() {
   
   const webcamRef = useRef<WebcamViewRef>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const faceDetectorRef = useRef<FaceDetector | null>(null);
   const animationRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
   const frameCountRef = useRef<number>(0);
+  const modelsLoadedRef = useRef(false);
   
   // Stabilization refs
   const emotionHistoryRef = useRef<Emotion[]>([]);
   const lastEmotionUpdateRef = useRef<number>(0);
-  const prevFaceMetricsRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
-  const movementHistoryRef = useRef<number[]>([]);
   const faceCountHistoryRef = useRef<number[]>([]);
   const lastFacePositionRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Initialize MediaPipe Face Detector
+  // Initialize face-api.js models
   useEffect(() => {
-    const initFaceDetector = async () => {
+    const loadModels = async () => {
       try {
-        const vision = await FilesetResolver.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-        );
+        const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model";
         
-        faceDetectorRef.current = await FaceDetector.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
-            delegate: "GPU",
-          },
-          runningMode: "VIDEO",
-          minDetectionConfidence: 0.7, // Higher threshold for stability
-        });
+        setLoadingMessage("Loading face detection model...");
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
         
+        setLoadingMessage("Loading face landmark model...");
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        
+        setLoadingMessage("Loading expression model...");
+        await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+        
+        modelsLoadedRef.current = true;
         setIsLoading(false);
         setIsRunning(true);
       } catch (err) {
-        console.error("Failed to initialize face detector:", err);
-        setError("Failed to load face detection model. Please refresh and try again.");
+        console.error("Failed to load face-api models:", err);
+        setError("Failed to load face detection models. Please refresh and try again.");
         setIsLoading(false);
       }
     };
 
-    initFaceDetector();
+    loadModels();
 
     return () => {
       if (animationRef.current) {
@@ -74,65 +72,42 @@ export default function FaceDetection() {
     };
   }, []);
 
-  // Estimate emotion based on face metrics and movement
-  const estimateEmotion = useCallback((detection: any): Emotion => {
-    const score = detection.categories?.[0]?.score || 0.5;
-    const box = detection.boundingBox;
-    
-    if (!box) return "Neutral";
-    
-    const currentMetrics = { x: box.originX, y: box.originY, w: box.width, h: box.height };
-    const prev = prevFaceMetricsRef.current;
-    
-    // Calculate movement/change
-    let movement = 0;
-    let sizeChange = 0;
-    
-    if (prev) {
-      movement = Math.abs(currentMetrics.x - prev.x) + Math.abs(currentMetrics.y - prev.y);
-      sizeChange = Math.abs(currentMetrics.w - prev.w) + Math.abs(currentMetrics.h - prev.h);
-    }
-    
-    prevFaceMetricsRef.current = currentMetrics;
-    
-    // Track movement history
-    movementHistoryRef.current.push(movement);
-    if (movementHistoryRef.current.length > 30) movementHistoryRef.current.shift();
-    
-    const avgMovement = movementHistoryRef.current.reduce((a, b) => a + b, 0) / 
-      Math.max(movementHistoryRef.current.length, 1);
-    
-    // Determine emotion based on movement primarily
-    // High movement = Surprised
-    if (avgMovement > 20) return "Surprised";
-    
-    // Moderate movement = Happy (animated/expressive)
-    if (avgMovement > 10) return "Happy";
-    
-    // Size changes (leaning in/out) = Focused
-    if (sizeChange > 15) return "Focused";
-    
-    // Very still with high confidence = Calm
-    if (avgMovement < 2 && score > 0.9) return "Calm";
-    
-    // Slight movement = Focused (paying attention)
-    if (avgMovement > 4) return "Focused";
-    
-    // Default = Neutral
-    return "Neutral";
+  // Convert face-api expression to our emotion type
+  const getTopEmotion = useCallback((expressions: faceapi.FaceExpressions): { emotion: Emotion; confidence: number } => {
+    const emotionMap: Record<string, Emotion> = {
+      happy: "Happy",
+      sad: "Sad",
+      angry: "Angry",
+      fearful: "Fearful",
+      disgusted: "Disgusted",
+      surprised: "Surprised",
+      neutral: "Neutral"
+    };
+
+    let topEmotion: Emotion = "Neutral";
+    let topScore = 0;
+
+    Object.entries(expressions).forEach(([emotion, score]) => {
+      if (score > topScore && emotionMap[emotion]) {
+        topScore = score;
+        topEmotion = emotionMap[emotion];
+      }
+    });
+
+    return { emotion: topEmotion, confidence: topScore };
   }, []);
 
-  // Get stabilized emotion (update every 1 second or when confident change)
-  const getStabilizedEmotion = useCallback((newEmotion: Emotion): Emotion => {
+  // Get stabilized emotion (update every 500ms or when confident change)
+  const getStabilizedEmotion = useCallback((newEmotion: Emotion, emotionConfidence: number): Emotion => {
     const now = performance.now();
     const history = emotionHistoryRef.current;
     
     // Add to history (keep last 20 frames)
     history.push(newEmotion);
-    if (history.length > 20) history.shift();
+    if (history.length > 15) history.shift();
     
-    // Only update displayed emotion every 1 second
-    if (now - lastEmotionUpdateRef.current < 1000) {
+    // Only update displayed emotion every 500ms for stability
+    if (now - lastEmotionUpdateRef.current < 500) {
       return currentEmotion;
     }
     
@@ -145,9 +120,9 @@ export default function FaceDetection() {
     const dominantEmotion = Object.entries(emotionCounts)
       .sort(([, a], [, b]) => b - a)[0]?.[0] as Emotion || "Neutral";
     
-    // Update if dominant emotion appears in >35% of frames
+    // Update if dominant emotion appears in >40% of frames or high confidence
     const dominantCount = emotionCounts[dominantEmotion] || 0;
-    if (dominantCount / history.length > 0.35) {
+    if (dominantCount / history.length > 0.4 || emotionConfidence > 0.7) {
       lastEmotionUpdateRef.current = now;
       return dominantEmotion;
     }
@@ -172,13 +147,17 @@ export default function FaceDetection() {
       .sort(([, a], [, b]) => b - a)[0]?.[0] || 0);
   }, []);
 
-  // Process frame for face detection
-  const processFrame = useCallback(() => {
+  // Process frame for face detection with expressions
+  const processFrame = useCallback(async () => {
     const video = webcamRef.current?.getVideo();
     const canvas = canvasRef.current;
-    const detector = faceDetectorRef.current;
 
-    if (!video || !canvas || !detector || !isRunning) return;
+    if (!video || !canvas || !modelsLoadedRef.current || !isRunning) {
+      if (isRunning) {
+        animationRef.current = requestAnimationFrame(processFrame);
+      }
+      return;
+    }
 
     if (video.readyState !== 4) {
       animationRef.current = requestAnimationFrame(processFrame);
@@ -194,7 +173,12 @@ export default function FaceDetection() {
 
     try {
       const startTime = performance.now();
-      const detections = detector.detectForVideo(video, startTime);
+      
+      // Detect faces with expressions
+      const detections = await faceapi
+        .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+        .withFaceLandmarks()
+        .withFaceExpressions();
       
       // Calculate FPS
       frameCountRef.current++;
@@ -206,31 +190,30 @@ export default function FaceDetection() {
       }
 
       // Update stabilized face count
-      const stableFaceCount = getStabilizedFaceCount(detections.detections.length);
+      const stableFaceCount = getStabilizedFaceCount(detections.length);
       setFaceCount(stableFaceCount);
 
-      detections.detections.forEach((detection, index) => {
-        const box = detection.boundingBox;
-        if (!box) return;
-
-        const detectionConfidence = detection.categories?.[0]?.score || 0;
+      detections.forEach((detection, index) => {
+        const box = detection.detection.box;
+        const expressions = detection.expressions;
+        
+        // Get top emotion from expressions
+        const { emotion: rawEmotion, confidence: emotionConfidence } = getTopEmotion(expressions);
+        const stableEmotion = getStabilizedEmotion(rawEmotion, emotionConfidence);
+        
         if (index === 0) {
-          setConfidence(Math.round(detectionConfidence * 100));
+          setCurrentEmotion(stableEmotion);
+          setConfidence(Math.round(emotionConfidence * 100));
         }
 
-        // Estimate and stabilize emotion
-        const rawEmotion = estimateEmotion(detection);
-        const stableEmotion = getStabilizedEmotion(rawEmotion);
-        if (index === 0) setCurrentEmotion(stableEmotion);
-
         // Smooth box position to reduce jitter
-        let smoothX = box.originX;
-        let smoothY = box.originY;
+        let smoothX = box.x;
+        let smoothY = box.y;
         
         if (lastFacePositionRef.current && index === 0) {
-          const smoothFactor = 0.3; // Lower = smoother
-          smoothX = lastFacePositionRef.current.x + (box.originX - lastFacePositionRef.current.x) * smoothFactor;
-          smoothY = lastFacePositionRef.current.y + (box.originY - lastFacePositionRef.current.y) * smoothFactor;
+          const smoothFactor = 0.3;
+          smoothX = lastFacePositionRef.current.x + (box.x - lastFacePositionRef.current.x) * smoothFactor;
+          smoothY = lastFacePositionRef.current.y + (box.y - lastFacePositionRef.current.y) * smoothFactor;
         }
         
         if (index === 0) {
@@ -250,8 +233,19 @@ export default function FaceDetection() {
 
         ctx.shadowBlur = 0;
 
+        // Get emotion emoji
+        const emotionEmojis: Record<Emotion, string> = {
+          Happy: "😊",
+          Sad: "😢",
+          Angry: "😠",
+          Fearful: "😨",
+          Disgusted: "🤢",
+          Surprised: "😲",
+          Neutral: "😐"
+        };
+
         // Draw label background
-        const label = `Face ${index + 1} • ${stableEmotion}`;
+        const label = `${emotionEmojis[stableEmotion]} ${stableEmotion} • ${Math.round(emotionConfidence * 100)}%`;
         ctx.font = "bold 14px 'JetBrains Mono'";
         const textWidth = ctx.measureText(label).width;
         
@@ -300,7 +294,7 @@ export default function FaceDetection() {
     }
 
     animationRef.current = requestAnimationFrame(processFrame);
-  }, [isRunning, estimateEmotion, getStabilizedEmotion, getStabilizedFaceCount]);
+  }, [isRunning, getTopEmotion, getStabilizedEmotion, getStabilizedFaceCount]);
 
   // Start processing when running
   useEffect(() => {
@@ -316,9 +310,20 @@ export default function FaceDetection() {
 
   const toggleRunning = () => setIsRunning(!isRunning);
 
+  // Get emotion emoji for stats
+  const emotionEmojis: Record<Emotion, string> = {
+    Happy: "😊",
+    Sad: "😢",
+    Angry: "😠",
+    Fearful: "😨",
+    Disgusted: "🤢",
+    Surprised: "😲",
+    Neutral: "😐"
+  };
+
   const stats = [
     { label: "Faces", value: faceCount, color: "cyan" as const },
-    { label: "Emotion", value: currentEmotion, color: "purple" as const },
+    { label: "Emotion", value: `${emotionEmojis[currentEmotion]} ${currentEmotion}`, color: "purple" as const },
     { label: "Confidence", value: `${confidence}%`, color: "green" as const },
     { label: "FPS", value: fps, color: "orange" as const },
   ];
@@ -328,8 +333,8 @@ export default function FaceDetection() {
       <Layout>
         <div className="container mx-auto px-4 py-8">
           <LoadingState
-            message="Loading Face Detection Model"
-            subMessage="Initializing MediaPipe Face Detector..."
+            message="Loading Face Detection Models"
+            subMessage={loadingMessage}
           />
         </div>
       </Layout>
@@ -349,7 +354,7 @@ export default function FaceDetection() {
               <h1 className="text-3xl font-bold">Face Detection & Emotion</h1>
             </div>
             <p className="text-muted-foreground">
-              Real-time face detection with stabilized emotion recognition
+              Real-time face detection with expression-based emotion recognition
             </p>
           </div>
           
@@ -399,21 +404,32 @@ export default function FaceDetection() {
             <h3 className="text-lg font-semibold mb-4">How It Works</h3>
             <div className="space-y-4 text-sm text-muted-foreground">
               <p>
-                This demo uses <span className="text-primary font-medium">MediaPipe Face Detector</span> with 
-                stabilization algorithms for smooth detection.
+                This demo uses <span className="text-primary font-medium">face-api.js</span> with 
+                deep learning models for accurate expression recognition.
               </p>
               <p>
-                Emotion estimation uses face metrics and is <span className="text-neon-cyan font-medium">stabilized over time</span> to 
-                prevent flickering and provide consistent results.
+                Emotions are detected from <span className="text-neon-cyan font-medium">actual facial expressions</span> like 
+                smile, frown, raised eyebrows, etc.
               </p>
+              <div className="pt-4 border-t border-border">
+                <h4 className="text-foreground font-medium mb-2">Detected Emotions:</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <span>😊 Happy</span>
+                  <span>😢 Sad</span>
+                  <span>😠 Angry</span>
+                  <span>😨 Fearful</span>
+                  <span>🤢 Disgusted</span>
+                  <span>😲 Surprised</span>
+                  <span>😐 Neutral</span>
+                </div>
+              </div>
               <div className="pt-4 border-t border-border">
                 <h4 className="text-foreground font-medium mb-2">Features:</h4>
                 <ul className="space-y-1">
-                  <li>• Stabilized multi-face detection</li>
-                  <li>• Smooth bounding box tracking</li>
-                  <li>• Temporal emotion averaging</li>
-                  <li>• GPU-accelerated processing</li>
-                  <li>• Reduced jitter & flickering</li>
+                  <li>• Expression-based detection</li>
+                  <li>• Multi-face support</li>
+                  <li>• Real-time processing</li>
+                  <li>• Stabilized output</li>
                 </ul>
               </div>
             </div>
