@@ -4,11 +4,16 @@ import { WebcamView, WebcamViewRef } from "@/components/WebcamView";
 import { StatsDisplay } from "@/components/StatsDisplay";
 import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
-import { Activity, Play, Pause, RefreshCw, Dumbbell } from "lucide-react";
+import { Activity, Play, Pause, RefreshCw, Dumbbell, RotateCcw } from "lucide-react";
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 
 // Pose landmark indices
 const POSE = {
+  NOSE: 0,
+  LEFT_EYE: 2,
+  RIGHT_EYE: 5,
+  LEFT_EAR: 7,
+  RIGHT_EAR: 8,
   LEFT_SHOULDER: 11,
   RIGHT_SHOULDER: 12,
   LEFT_ELBOW: 13,
@@ -31,8 +36,160 @@ const calculateAngle = (a: any, b: any, c: any): number => {
   return angle;
 };
 
+// Exercise configurations
+type ExerciseType = "squats" | "pushups" | "lunges" | "jumping_jacks" | "arm_raises" | "high_knees" | "none";
+
+interface ExerciseConfig {
+  name: string;
+  emoji: string;
+  description: string;
+  checkDown: (landmarks: any[], angle: number) => boolean;
+  checkUp: (landmarks: any[], angle: number) => boolean;
+  getAngle: (landmarks: any[]) => number;
+  tips: string[];
+}
+
+const exercises: Record<Exclude<ExerciseType, "none">, ExerciseConfig> = {
+  squats: {
+    name: "Squats",
+    emoji: "🦵",
+    description: "Bend knees to 90°, then stand up",
+    checkDown: (_, angle) => angle < 90,
+    checkUp: (_, angle) => angle > 160,
+    getAngle: (landmarks) => calculateAngle(
+      landmarks[POSE.LEFT_HIP],
+      landmarks[POSE.LEFT_KNEE],
+      landmarks[POSE.LEFT_ANKLE]
+    ),
+    tips: ["Keep back straight", "Knees over toes", "Go parallel or below"],
+  },
+  pushups: {
+    name: "Push-ups",
+    emoji: "💪",
+    description: "Lower chest to ground, push back up",
+    checkDown: (_, angle) => angle < 90,
+    checkUp: (_, angle) => angle > 160,
+    getAngle: (landmarks) => calculateAngle(
+      landmarks[POSE.LEFT_SHOULDER],
+      landmarks[POSE.LEFT_ELBOW],
+      landmarks[POSE.LEFT_WRIST]
+    ),
+    tips: ["Keep body straight", "Elbows at 45°", "Full range of motion"],
+  },
+  lunges: {
+    name: "Lunges",
+    emoji: "🏃",
+    description: "Step forward, lower back knee",
+    checkDown: (landmarks, angle) => {
+      const frontKneeAngle = calculateAngle(
+        landmarks[POSE.LEFT_HIP],
+        landmarks[POSE.LEFT_KNEE],
+        landmarks[POSE.LEFT_ANKLE]
+      );
+      return frontKneeAngle < 100;
+    },
+    checkUp: (_, angle) => angle > 160,
+    getAngle: (landmarks) => calculateAngle(
+      landmarks[POSE.LEFT_HIP],
+      landmarks[POSE.LEFT_KNEE],
+      landmarks[POSE.LEFT_ANKLE]
+    ),
+    tips: ["Front knee at 90°", "Back knee near ground", "Keep torso upright"],
+  },
+  jumping_jacks: {
+    name: "Jumping Jacks",
+    emoji: "⭐",
+    description: "Jump with arms and legs spread",
+    checkDown: (landmarks) => {
+      const armAngle = calculateAngle(
+        landmarks[POSE.LEFT_HIP],
+        landmarks[POSE.LEFT_SHOULDER],
+        landmarks[POSE.LEFT_WRIST]
+      );
+      return armAngle < 45;
+    },
+    checkUp: (landmarks) => {
+      const armAngle = calculateAngle(
+        landmarks[POSE.LEFT_HIP],
+        landmarks[POSE.LEFT_SHOULDER],
+        landmarks[POSE.LEFT_WRIST]
+      );
+      return armAngle > 150;
+    },
+    getAngle: (landmarks) => calculateAngle(
+      landmarks[POSE.LEFT_HIP],
+      landmarks[POSE.LEFT_SHOULDER],
+      landmarks[POSE.LEFT_WRIST]
+    ),
+    tips: ["Arms fully extended", "Jump with both feet", "Land softly"],
+  },
+  arm_raises: {
+    name: "Arm Raises",
+    emoji: "🙌",
+    description: "Raise arms overhead, lower down",
+    checkDown: (landmarks) => {
+      const armAngle = calculateAngle(
+        landmarks[POSE.LEFT_HIP],
+        landmarks[POSE.LEFT_SHOULDER],
+        landmarks[POSE.LEFT_WRIST]
+      );
+      return armAngle < 30;
+    },
+    checkUp: (landmarks) => {
+      const armAngle = calculateAngle(
+        landmarks[POSE.LEFT_HIP],
+        landmarks[POSE.LEFT_SHOULDER],
+        landmarks[POSE.LEFT_WRIST]
+      );
+      return armAngle > 160;
+    },
+    getAngle: (landmarks) => calculateAngle(
+      landmarks[POSE.LEFT_HIP],
+      landmarks[POSE.LEFT_SHOULDER],
+      landmarks[POSE.LEFT_WRIST]
+    ),
+    tips: ["Keep arms straight", "Control the movement", "Breathe steadily"],
+  },
+  high_knees: {
+    name: "High Knees",
+    emoji: "🦶",
+    description: "Lift knees to hip level alternating",
+    checkDown: (landmarks) => {
+      const leftKneeHeight = landmarks[POSE.LEFT_KNEE].y;
+      const leftHipHeight = landmarks[POSE.LEFT_HIP].y;
+      const rightKneeHeight = landmarks[POSE.RIGHT_KNEE].y;
+      const rightHipHeight = landmarks[POSE.RIGHT_HIP].y;
+      // Both knees below hips
+      return leftKneeHeight > leftHipHeight && rightKneeHeight > rightHipHeight;
+    },
+    checkUp: (landmarks) => {
+      const leftKneeHeight = landmarks[POSE.LEFT_KNEE].y;
+      const leftHipHeight = landmarks[POSE.LEFT_HIP].y;
+      const rightKneeHeight = landmarks[POSE.RIGHT_KNEE].y;
+      const rightHipHeight = landmarks[POSE.RIGHT_HIP].y;
+      // Either knee at or above hip level
+      return leftKneeHeight <= leftHipHeight || rightKneeHeight <= rightHipHeight;
+    },
+    getAngle: (landmarks) => {
+      // Return the higher knee's angle relative to hip
+      const leftAngle = calculateAngle(
+        landmarks[POSE.LEFT_SHOULDER],
+        landmarks[POSE.LEFT_HIP],
+        landmarks[POSE.LEFT_KNEE]
+      );
+      const rightAngle = calculateAngle(
+        landmarks[POSE.RIGHT_SHOULDER],
+        landmarks[POSE.RIGHT_HIP],
+        landmarks[POSE.RIGHT_KNEE]
+      );
+      return Math.min(leftAngle, rightAngle);
+    },
+    tips: ["Pump your arms", "Stay on balls of feet", "Keep core tight"],
+  },
+};
+
 /**
- * Pose Estimation page with exercise counter
+ * Pose Estimation page with multiple exercise counters
  * Uses MediaPipe Pose Landmarker for body tracking and rep counting
  */
 export default function PoseEstimation() {
@@ -42,10 +199,11 @@ export default function PoseEstimation() {
   const [fps, setFps] = useState(0);
   
   // Exercise state
-  const [exercise, setExercise] = useState<"squats" | "pushups" | "none">("none");
+  const [exercise, setExercise] = useState<ExerciseType>("none");
   const [repCount, setRepCount] = useState(0);
   const [isDown, setIsDown] = useState(false);
   const [currentAngle, setCurrentAngle] = useState(0);
+  const [feedback, setFeedback] = useState("");
   
   const webcamRef = useRef<WebcamViewRef>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -126,31 +284,18 @@ export default function PoseEstimation() {
         const landmarks = results.landmarks[0];
         
         // Exercise detection and counting
-        if (exercise === "squats") {
-          const hip = landmarks[POSE.LEFT_HIP];
-          const knee = landmarks[POSE.LEFT_KNEE];
-          const ankle = landmarks[POSE.LEFT_ANKLE];
-          const angle = calculateAngle(hip, knee, ankle);
+        if (exercise !== "none") {
+          const config = exercises[exercise];
+          const angle = config.getAngle(landmarks);
           setCurrentAngle(Math.round(angle));
           
-          if (angle < 90 && !isDown) {
+          if (config.checkDown(landmarks, angle) && !isDown) {
             setIsDown(true);
-          } else if (angle > 160 && isDown) {
+            setFeedback("Down! ⬇️");
+          } else if (config.checkUp(landmarks, angle) && isDown) {
             setIsDown(false);
             setRepCount(prev => prev + 1);
-          }
-        } else if (exercise === "pushups") {
-          const shoulder = landmarks[POSE.LEFT_SHOULDER];
-          const elbow = landmarks[POSE.LEFT_ELBOW];
-          const wrist = landmarks[POSE.LEFT_WRIST];
-          const angle = calculateAngle(shoulder, elbow, wrist);
-          setCurrentAngle(Math.round(angle));
-          
-          if (angle < 90 && !isDown) {
-            setIsDown(true);
-          } else if (angle > 160 && isDown) {
-            setIsDown(false);
-            setRepCount(prev => prev + 1);
+            setFeedback("Up! ⬆️ +1");
           }
         }
 
@@ -203,10 +348,12 @@ export default function PoseEstimation() {
         // Draw angle indicator for active exercise
         if (exercise !== "none") {
           ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-          ctx.fillRect(20, 20, 120, 40);
+          ctx.fillRect(20, 20, 140, 50);
           ctx.fillStyle = "hsl(142, 76%, 45%)";
           ctx.font = "bold 20px 'JetBrains Mono'";
           ctx.fillText(`${currentAngle}°`, 30, 50);
+          ctx.font = "14px 'JetBrains Mono'";
+          ctx.fillText(feedback, 30, 65);
         }
       }
     } catch (err) {
@@ -214,7 +361,7 @@ export default function PoseEstimation() {
     }
 
     animationRef.current = requestAnimationFrame(processFrame);
-  }, [isRunning, exercise, isDown, currentAngle]);
+  }, [isRunning, exercise, isDown, currentAngle, feedback]);
 
   useEffect(() => {
     if (isRunning && !isLoading) {
@@ -229,19 +376,21 @@ export default function PoseEstimation() {
 
   const toggleRunning = () => setIsRunning(!isRunning);
   
-  const selectExercise = (ex: "squats" | "pushups") => {
+  const selectExercise = (ex: ExerciseType) => {
     setExercise(ex);
     setRepCount(0);
     setIsDown(false);
+    setFeedback("");
   };
 
   const resetCounter = () => {
     setRepCount(0);
     setIsDown(false);
+    setFeedback("");
   };
 
   const stats = [
-    { label: "Exercise", value: exercise === "none" ? "None" : exercise.charAt(0).toUpperCase() + exercise.slice(1), color: "green" as const },
+    { label: "Exercise", value: exercise === "none" ? "None" : exercises[exercise].name, color: "green" as const },
     { label: "Reps", value: repCount, color: "cyan" as const },
     { label: "FPS", value: fps, color: "orange" as const },
   ];
@@ -334,38 +483,52 @@ export default function PoseEstimation() {
             </div>
 
             {/* Exercise selection */}
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Select Exercise:</p>
-              <Button
-                variant={exercise === "squats" ? "gradient" : "outline"}
-                className="w-full justify-start gap-3"
-                onClick={() => selectExercise("squats")}
-              >
-                <span className="text-2xl">🦵</span>
-                <span>Squats</span>
-              </Button>
-              <Button
-                variant={exercise === "pushups" ? "gradient" : "outline"}
-                className="w-full justify-start gap-3"
-                onClick={() => selectExercise("pushups")}
-              >
-                <span className="text-2xl">💪</span>
-                <span>Push-ups</span>
-              </Button>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              <p className="text-sm font-medium sticky top-0 bg-card py-1">Select Exercise:</p>
+              {(Object.keys(exercises) as Exclude<ExerciseType, "none">[]).map((ex) => {
+                const config = exercises[ex];
+                return (
+                  <Button
+                    key={ex}
+                    variant={exercise === ex ? "gradient" : "outline"}
+                    className="w-full justify-start gap-3"
+                    onClick={() => selectExercise(ex)}
+                  >
+                    <span className="text-xl">{config.emoji}</span>
+                    <div className="text-left">
+                      <span className="block">{config.name}</span>
+                      <span className="text-xs text-muted-foreground">{config.description}</span>
+                    </div>
+                  </Button>
+                );
+              })}
             </div>
 
             {exercise !== "none" && (
               <Button
                 variant="outline"
-                className="w-full mt-4"
+                className="w-full mt-4 gap-2"
                 onClick={resetCounter}
               >
+                <RotateCcw className="w-4 h-4" />
                 Reset Counter
               </Button>
             )}
 
-            <div className="mt-6 pt-4 border-t border-border">
-              <h4 className="text-sm font-medium mb-2">Tips:</h4>
+            {/* Exercise tips */}
+            {exercise !== "none" && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <h4 className="text-sm font-medium mb-2">Tips for {exercises[exercise].name}:</h4>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  {exercises[exercise].tips.map((tip, i) => (
+                    <li key={i}>• {tip}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="mt-4 pt-4 border-t border-border">
+              <h4 className="text-sm font-medium mb-2">General Tips:</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>• Stand sideways to camera for best results</li>
                 <li>• Ensure full body is visible</li>
