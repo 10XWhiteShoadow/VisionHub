@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Home, Scan, Hand, Package, Activity, FileText, Github, UserCheck, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "./ThemeToggle";
 interface LayoutProps {
   children: ReactNode;
 }
@@ -102,15 +101,12 @@ export function Layout({
             })}
             </div>
 
-            {/* Right side actions */}
-            <div className="flex items-center gap-2 opacity-0 animate-fade-in" style={{ animationDelay: "0.3s" }}>
-              <ThemeToggle />
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hidden sm:flex">
-                <Button variant="ghost" size="icon" className="transition-all duration-300 hover:scale-110 hover:rotate-12 hover:bg-primary/10">
-                  <Github className="w-5 h-5" />
-                </Button>
-              </a>
-            </div>
+            {/* GitHub link */}
+            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hidden sm:flex opacity-0 animate-fade-in" style={{ animationDelay: "0.3s" }}>
+              <Button variant="ghost" size="icon" className="transition-all duration-300 hover:scale-110 hover:rotate-12 hover:bg-primary/10">
+                <Github className="w-5 h-5" />
+              </Button>
+            </a>
           </nav>
         </div>
       </header>
