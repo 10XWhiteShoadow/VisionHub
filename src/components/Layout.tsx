@@ -58,18 +58,25 @@ export function Layout({
         <div className="container mx-auto px-4">
           <nav className="flex items-center justify-between h-16">
             {/* Logo with hover animation */}
-            <Link to="/" className="flex items-center gap-2.5 opacity-0 animate-fade-in group">
-              <div className="relative w-9 h-9">
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-primary/60 rotate-6 group-hover:rotate-12 transition-transform duration-300" />
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg">
-                  <div className="relative">
-                    <Scan className="w-5 h-5 text-primary-foreground" />
-                    <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                  </div>
+            <Link to="/" className="flex items-center gap-3 opacity-0 animate-fade-in group">
+              <div className="relative w-10 h-10">
+                {/* Outer ring */}
+                <div className="absolute inset-0 rounded-full border-2 border-primary/30 group-hover:border-primary/60 transition-colors duration-300" />
+                {/* Middle animated ring */}
+                <div className="absolute inset-1 rounded-full border-2 border-primary group-hover:scale-110 transition-transform duration-300" />
+                {/* Inner eye/lens */}
+                <div className="absolute inset-2.5 rounded-full bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg shadow-primary/30">
+                  <div className="absolute inset-1 rounded-full bg-gradient-to-br from-primary-foreground/20 to-transparent" />
+                  <div className="absolute top-1 left-1.5 w-1.5 h-1.5 rounded-full bg-primary-foreground/60" />
+                </div>
+                {/* Scanning line effect */}
+                <div className="absolute inset-0 rounded-full overflow-hidden">
+                  <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary-foreground/40 to-transparent group-hover:animate-pulse" />
                 </div>
               </div>
-              <span className="font-bold text-lg hidden sm:inline bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                VisionHub
+              <span className="font-bold text-xl hidden sm:inline tracking-tight">
+                <span className="text-primary">Vision</span>
+                <span className="text-foreground">Hub</span>
               </span>
             </Link>
 
