@@ -58,11 +58,19 @@ export function Layout({
         <div className="container mx-auto px-4">
           <nav className="flex items-center justify-between h-16">
             {/* Logo with hover animation */}
-            <Link to="/" className="flex items-center gap-2 opacity-0 animate-fade-in">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <Scan className="w-5 h-5 text-primary-foreground" />
+            <Link to="/" className="flex items-center gap-2.5 opacity-0 animate-fade-in group">
+              <div className="relative w-9 h-9">
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-primary/60 rotate-6 group-hover:rotate-12 transition-transform duration-300" />
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg">
+                  <div className="relative">
+                    <Scan className="w-5 h-5 text-primary-foreground" />
+                    <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  </div>
+                </div>
               </div>
-              <span className="font-bold text-lg hidden sm:inline">VisionAI</span>
+              <span className="font-bold text-lg hidden sm:inline bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                VisionHub
+              </span>
             </Link>
 
             {/* Navigation links with stagger animation */}
