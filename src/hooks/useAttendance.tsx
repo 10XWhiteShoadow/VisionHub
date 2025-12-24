@@ -100,6 +100,12 @@ export const useAttendance = () => {
       return { success: false };
     }
 
+    // Get current user for RLS
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false };
+    }
+
     const { data, error } = await supabase
       .from("attendance_records")
       .insert({
@@ -108,6 +114,7 @@ export const useAttendance = () => {
         roll_no: rollNo,
         status: "present",
         date: today,
+        user_id: user.id,
       })
       .select()
       .single();
@@ -137,6 +144,13 @@ export const useAttendance = () => {
     setSaving(true);
     let savedCount = 0;
 
+    // Get current user for RLS
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setSaving(false);
+      return { success: false, savedCount: 0 };
+    }
+
     for (const item of attendanceList) {
       const existing = records.find((r) => r.studentId === item.studentId);
       if (!existing) {
@@ -146,6 +160,7 @@ export const useAttendance = () => {
           roll_no: item.rollNo,
           status: "present",
           date: today,
+          user_id: user.id,
         });
 
         if (!error) {

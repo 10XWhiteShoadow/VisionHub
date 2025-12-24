@@ -137,11 +137,18 @@ export const useStudents = () => {
       imageUrl = await uploadPhoto(imageBlob, id);
     }
 
+    // Get current user for RLS
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "You must be logged in to add students" };
+    }
+
     const { error } = await supabase.from("students").insert({
       id,
       name,
       roll_no: rollNo,
       image_url: imageUrl,
+      user_id: user.id,
     });
 
     if (error) {

@@ -67,12 +67,20 @@ export function useBackgroundRemovalHistory() {
       return null;
     }
 
+    // Get current user for RLS
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      logger.error("useBackgroundRemovalHistory", new Error("User not authenticated"));
+      return null;
+    }
+
     // Save to database
     const { data, error } = await supabase
       .from("background_removal_history")
       .insert({
         original_image_url: origUrlData.signedUrl,
         processed_image_url: procUrlData.signedUrl,
+        user_id: user.id,
       })
       .select()
       .single();
