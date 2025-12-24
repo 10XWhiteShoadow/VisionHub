@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import Webcam from "react-webcam";
 import { useStudents, Student } from "@/hooks/useStudents";
+import { useAttendance } from "@/hooks/useAttendance";
 import {
   FaceDetector,
   FilesetResolver,
@@ -22,28 +23,16 @@ import {
   Loader2,
   UserPlus,
   Sparkles,
-  Camera,
-  X,
+  Download,
+  Save,
   Scan,
   Zap,
-  Shield
 } from "lucide-react";
-
-interface AttendanceRecord {
-  studentId: string;
-  studentName: string;
-  rollNo: string;
-  timestamp: string;
-  date: string;
-  status: "present" | "absent";
-}
 
 interface FaceMatch {
   student: Student;
   confidence: number;
 }
-
-const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/125iuh-wPn_XFNfmjufOkB0anM3wGG3_9Cq5X_IxlICc/edit?usp=sharing";
 
 // Minimum confidence for auto-match (0-1)
 const AUTO_MATCH_THRESHOLD = 0.6;
@@ -61,17 +50,24 @@ const Attendance = () => {
   const matchCanvasRef = useRef<HTMLCanvasElement>(null);
   
   const { students, loading: studentsLoading } = useStudents();
+  const { 
+    records: todayAttendance, 
+    loading: attendanceLoading,
+    saving,
+    markPresent: markPresentInDb,
+    exportToCSV,
+    fetchAllAttendance,
+  } = useAttendance();
   
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [faceDetector, setFaceDetector] = useState<FaceDetector | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [detectedFaces, setDetectedFaces] = useState(0);
   const [lastDetection, setLastDetection] = useState<string | null>(null);
   const [autoMode, setAutoMode] = useState(true);
   const [currentMatch, setCurrentMatch] = useState<FaceMatch | null>(null);
   const [isMatching, setIsMatching] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   // Refs for stabilization
   const lastMarkTimeRef = useRef<Record<string, number>>({});
@@ -279,26 +275,22 @@ const Attendance = () => {
     
     lastMarkTimeRef.current[match.student.id] = now;
     
-    const record: AttendanceRecord = {
-      studentId: match.student.id,
-      studentName: match.student.name,
-      rollNo: match.student.rollNo,
-      timestamp: new Date().toLocaleTimeString(),
-      date: new Date().toLocaleDateString(),
-      status: "present",
-    };
+    const result = await markPresentInDb(
+      match.student.id,
+      match.student.name,
+      match.student.rollNo
+    );
     
-    setTodayAttendance(prev => [...prev, record]);
-    setLastDetection(match.student.name);
-    
-    // Clear match history after successful mark
-    matchHistoryRef.current = [];
-    
-    toast({
-      title: "✓ Auto-Marked Present",
-      description: `${match.student.name} recognized and marked at ${record.timestamp}`,
-    });
-  }, [todayAttendance, toast]);
+    if (result.success) {
+      setLastDetection(match.student.name);
+      matchHistoryRef.current = [];
+      
+      toast({
+        title: "✓ Auto-Marked Present",
+        description: `${match.student.name} recognized and saved`,
+      });
+    }
+  }, [todayAttendance, toast, markPresentInDb]);
 
   // Process video frame for face detection and matching
   const processFrame = useCallback(async () => {
@@ -433,69 +425,40 @@ const Attendance = () => {
   }, [isProcessing, faceDetector, processFrame]);
 
   // Manual mark attendance
-  const markPresent = (student: Student) => {
-    const now = new Date();
-    const record: AttendanceRecord = {
-      studentId: student.id,
-      studentName: student.name,
-      rollNo: student.rollNo,
-      timestamp: now.toLocaleTimeString(),
-      date: now.toLocaleDateString(),
-      status: "present",
-    };
-
-    setTodayAttendance((prev) => {
-      const exists = prev.find((r) => r.studentId === student.id);
-      if (exists) {
-        toast({
-          title: "Already Marked",
-          description: `${student.name} is already marked present`,
-        });
-        return prev;
-      }
-      return [...prev, record];
-    });
-
-    setLastDetection(student.name);
-    lastMarkTimeRef.current[student.id] = Date.now();
-    
-    toast({
-      title: "Attendance Marked! ✓",
-      description: `${student.name} marked present at ${record.timestamp}`,
-    });
-  };
-
-  // Submit to Google Sheets
-  const submitToGoogleSheets = async () => {
-    if (todayAttendance.length === 0) {
+  const markPresent = async (student: Student) => {
+    const exists = todayAttendance.find((r) => r.studentId === student.id);
+    if (exists) {
       toast({
-        title: "No Attendance",
-        description: "Mark some students present first",
-        variant: "destructive",
+        title: "Already Marked",
+        description: `${student.name} is already marked present`,
       });
       return;
     }
 
-    setIsSubmitting(true);
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
+    const result = await markPresentInDb(student.id, student.name, student.rollNo);
+    
+    if (result.success) {
+      setLastDetection(student.name);
+      lastMarkTimeRef.current[student.id] = Date.now();
+      
       toast({
-        title: "Attendance Submitted! 🎉",
-        description: `${todayAttendance.length} records sent to Google Sheets`,
+        title: "Attendance Marked! ✓",
+        description: `${student.name} marked present and saved`,
       });
-
-      window.open(GOOGLE_SHEET_URL, "_blank");
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to submit attendance",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
     }
+  };
+
+  // Export all attendance records
+  const handleExportAll = async () => {
+    setIsExporting(true);
+    const allRecords = await fetchAllAttendance();
+    exportToCSV(allRecords, `all_attendance_${new Date().toISOString().split('T')[0]}.csv`);
+    setIsExporting(false);
+  };
+
+  // Export today's attendance
+  const handleExportToday = () => {
+    exportToCSV(todayAttendance);
   };
 
   const today = new Date().toLocaleDateString("en-US", {
@@ -508,7 +471,7 @@ const Attendance = () => {
   const presentCount = todayAttendance.length;
   const totalStudents = students.length;
 
-  if (isModelLoading || studentsLoading) {
+  if (isModelLoading || studentsLoading || attendanceLoading) {
     return (
       <Layout>
         <LoadingState
@@ -736,19 +699,30 @@ const Attendance = () => {
                 )}
               </Card>
 
-              {/* Submit Button */}
-              <Button
-                onClick={submitToGoogleSheets}
-                disabled={isSubmitting || todayAttendance.length === 0}
-                className="w-full gap-2 bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90 h-12"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Send className="w-5 h-5" />
-                )}
-                Submit to Google Sheets
-              </Button>
+              {/* Export Buttons */}
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleExportToday}
+                  disabled={todayAttendance.length === 0}
+                  variant="outline"
+                  className="flex-1 gap-2 hover:border-neon-cyan/50"
+                >
+                  <Download className="w-4 h-4" />
+                  Export Today
+                </Button>
+                <Button
+                  onClick={handleExportAll}
+                  disabled={isExporting}
+                  className="flex-1 gap-2 bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90"
+                >
+                  {isExporting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  Export All
+                </Button>
+              </div>
             </div>
           </div>
         </div>
