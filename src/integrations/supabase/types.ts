@@ -55,6 +55,27 @@ export type Database = {
           },
         ]
       }
+      background_removal_history: {
+        Row: {
+          created_at: string
+          id: string
+          original_image_url: string
+          processed_image_url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          original_image_url: string
+          processed_image_url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          original_image_url?: string
+          processed_image_url?: string
+        }
+        Relationships: []
+      }
       students: {
         Row: {
           created_at: string

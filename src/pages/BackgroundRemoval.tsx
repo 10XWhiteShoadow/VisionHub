@@ -3,10 +3,12 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Upload, Download, Loader2, ImageIcon, Trash2, Paintbrush, Eraser, RotateCcw } from "lucide-react";
+import { Upload, Download, Loader2, ImageIcon, Trash2, Paintbrush, Eraser, RotateCcw, History, Clock, Save } from "lucide-react";
 import { toast } from "sonner";
 import { removeBackground, loadImage } from "@/lib/backgroundRemoval";
 import { cn } from "@/lib/utils";
+import { useBackgroundRemovalHistory, BackgroundRemovalRecord } from "@/hooks/useBackgroundRemovalHistory";
+import { format } from "date-fns";
 
 type BrushMode = "erase" | "restore";
 
@@ -19,6 +21,12 @@ export default function BackgroundRemoval() {
   const [brushSize, setBrushSize] = useState(30);
   const [brushMode, setBrushMode] = useState<BrushMode>("erase");
   const [isDrawing, setIsDrawing] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [originalBlob, setOriginalBlob] = useState<Blob | null>(null);
+  const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const { history, isLoading: historyLoading, saveToHistory, deleteFromHistory } = useBackgroundRemovalHistory();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -85,8 +93,11 @@ export default function BackgroundRemoval() {
 
     const url = URL.createObjectURL(file);
     setOriginalImage(url);
+    setOriginalBlob(file);
     setProcessedImage(null);
+    setProcessedBlob(null);
     setShowEditor(false);
+    setShowHistory(false);
     setIsProcessing(true);
     setProgressMessage("Starting...");
 
@@ -95,6 +106,7 @@ export default function BackgroundRemoval() {
       const resultBlob = await removeBackground(img, setProgressMessage);
       const resultUrl = URL.createObjectURL(resultBlob);
       setProcessedImage(resultUrl);
+      setProcessedBlob(resultBlob);
       toast.success("Background removed successfully!");
     } catch (error) {
       console.error("Error:", error);
@@ -319,11 +331,54 @@ export default function BackgroundRemoval() {
   const handleClear = useCallback(() => {
     setOriginalImage(null);
     setProcessedImage(null);
+    setOriginalBlob(null);
+    setProcessedBlob(null);
     setShowEditor(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   }, []);
+
+  const handleSaveToHistory = async () => {
+    if (!originalBlob || !processedBlob) {
+      toast.error("No image to save");
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const result = await saveToHistory(originalBlob, processedBlob);
+      if (result) {
+        toast.success("Saved to history!");
+      } else {
+        toast.error("Failed to save to history");
+      }
+    } catch (error) {
+      console.error("Error saving:", error);
+      toast.error("Failed to save to history");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteFromHistory = async (record: BackgroundRemovalRecord) => {
+    const success = await deleteFromHistory(record.id, record.original_image_url, record.processed_image_url);
+    if (success) {
+      toast.success("Deleted from history");
+    } else {
+      toast.error("Failed to delete");
+    }
+  };
+
+  const handleLoadFromHistory = (record: BackgroundRemovalRecord) => {
+    setOriginalImage(record.original_image_url);
+    setProcessedImage(record.processed_image_url);
+    setShowHistory(false);
+    setShowEditor(false);
+    setOriginalBlob(null);
+    setProcessedBlob(null);
+    toast.success("Loaded from history");
+  };
 
   return (
     <Layout>
@@ -336,10 +391,92 @@ export default function BackgroundRemoval() {
               Remove backgrounds from your images using AI-powered segmentation. 
               Use the brush tool for precise manual refinement.
             </p>
+            <Button
+              variant="outline"
+              onClick={() => setShowHistory(!showHistory)}
+              className="mt-2"
+            >
+              <History className="w-4 h-4 mr-2" />
+              {showHistory ? "Hide History" : "View History"}
+            </Button>
           </div>
 
+          {/* History Section */}
+          {showHistory && (
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  Background Removal History
+                </CardTitle>
+                <CardDescription>
+                  Your previously processed images
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {historyLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : history.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No history yet. Process an image and save it to see it here.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {history.map((record) => (
+                      <div
+                        key={record.id}
+                        className="group relative rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-colors"
+                      >
+                        <div
+                          className="aspect-square"
+                          style={{
+                            backgroundImage: "linear-gradient(45deg, hsl(var(--muted)) 25%, transparent 25%), linear-gradient(-45deg, hsl(var(--muted)) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, hsl(var(--muted)) 75%), linear-gradient(-45deg, transparent 75%, hsl(var(--muted)) 75%)",
+                            backgroundSize: "10px 10px",
+                            backgroundPosition: "0 0, 0 5px, 5px -5px, -5px 0px"
+                          }}
+                        >
+                          <img
+                            src={record.processed_image_url}
+                            alt="Processed"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleLoadFromHistory(record)}
+                          >
+                            <ImageIcon className="w-4 h-4 mr-1" />
+                            Load
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDeleteFromHistory(record)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm px-2 py-1">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {format(new Date(record.created_at), "MMM d, yyyy HH:mm")}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Upload Area */}
-          {!originalImage && (
+          {!originalImage && !showHistory && (
             <Card className="glass-card border-dashed border-2 border-primary/30 hover:border-primary/50 transition-colors">
               <CardContent className="p-12">
                 <div
@@ -400,6 +537,20 @@ export default function BackgroundRemoval() {
                   <Download className="w-4 h-4 mr-2" />
                   Download Result
                 </Button>
+                {originalBlob && processedBlob && (
+                  <Button
+                    variant="secondary"
+                    onClick={handleSaveToHistory}
+                    disabled={isProcessing || isSaving}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-2" />
+                    )}
+                    Save to History
+                  </Button>
+                )}
               </div>
 
               {/* Image Comparison */}
