@@ -4,7 +4,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Upload, Download, Loader2, ImageIcon, Trash2, Paintbrush, Eraser, RotateCcw, History, Clock, Save, SlidersHorizontal, Palette, Image as ImageLucide } from "lucide-react";
+import { Upload, Download, Loader2, ImageIcon, Trash2, Paintbrush, Eraser, RotateCcw, History, Clock, Save, SlidersHorizontal, Palette, Image as ImageLucide, Undo2, Redo2 } from "lucide-react";
 import { ImageComparisonSlider } from "@/components/ImageComparisonSlider";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,8 @@ const PRESET_COLORS = [
   "#FFFF00", "#FF00FF", "#00FFFF", "#808080", "#FFA500",
   "#800080", "#008080", "#FFC0CB", "#A52A2A", "#F5F5DC"
 ];
+
+const MAX_HISTORY_SIZE = 50;
 
 export default function BackgroundRemoval() {
   const navigate = useNavigate();
@@ -45,6 +47,11 @@ export default function BackgroundRemoval() {
   const [backgroundColor, setBackgroundColor] = useState("#FFFFFF");
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [compositeImage, setCompositeImage] = useState<string | null>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
+  
+  // Undo/Redo state
+  const [undoStack, setUndoStack] = useState<ImageData[]>([]);
+  const [redoStack, setRedoStack] = useState<ImageData[]>([]);
   
   const { history, isLoading: historyLoading, saveToHistory, deleteFromHistory } = useBackgroundRemovalHistory();
   
@@ -72,6 +79,10 @@ export default function BackgroundRemoval() {
       
       if (!ctx || !maskCtx) return;
 
+      setCanvasReady(false);
+      setUndoStack([]);
+      setRedoStack([]);
+
       // Use createImageBitmap to avoid canvas tainting issues with blob URLs
       const initCanvas = async () => {
         try {
@@ -98,18 +109,7 @@ export default function BackgroundRemoval() {
           maskCanvas.width = width;
           maskCanvas.height = height;
           
-          // Draw processed image
-          ctx.drawImage(processedBitmap, 0, 0, width, height);
-          
-          // Store as Image elements for later use (create from canvas to avoid CORS)
-          const processedDataUrl = canvas.toDataURL("image/png");
-          const processedImg = new Image();
-          processedImg.onload = () => {
-            processedImageRef.current = processedImg;
-          };
-          processedImg.src = processedDataUrl;
-          
-          // Create original image from bitmap
+          // Create original image from bitmap first
           const origCanvas = document.createElement("canvas");
           origCanvas.width = width;
           origCanvas.height = height;
@@ -118,15 +118,51 @@ export default function BackgroundRemoval() {
             origCtx.drawImage(originalBitmap, 0, 0, width, height);
             const origDataUrl = origCanvas.toDataURL("image/png");
             const origImg = new Image();
-            origImg.onload = () => {
-              originalImageRef.current = origImg;
-            };
-            origImg.src = origDataUrl;
+            await new Promise<void>((resolve) => {
+              origImg.onload = () => {
+                originalImageRef.current = origImg;
+                resolve();
+              };
+              origImg.src = origDataUrl;
+            });
           }
           
-          // Initialize mask as fully opaque (white = keep)
-          maskCtx.fillStyle = "white";
-          maskCtx.fillRect(0, 0, width, height);
+          // Create processed image from bitmap
+          const procCanvas = document.createElement("canvas");
+          procCanvas.width = width;
+          procCanvas.height = height;
+          const procCtx = procCanvas.getContext("2d");
+          if (procCtx) {
+            procCtx.drawImage(processedBitmap, 0, 0, width, height);
+            const procDataUrl = procCanvas.toDataURL("image/png");
+            const procImg = new Image();
+            await new Promise<void>((resolve) => {
+              procImg.onload = () => {
+                processedImageRef.current = procImg;
+                resolve();
+              };
+              procImg.src = procDataUrl;
+            });
+            
+            // Initialize mask from processed image alpha
+            const procImageData = procCtx.getImageData(0, 0, width, height);
+            const maskImageData = maskCtx.createImageData(width, height);
+            
+            for (let i = 0; i < procImageData.data.length; i += 4) {
+              const alpha = procImageData.data[i + 3];
+              maskImageData.data[i] = alpha;
+              maskImageData.data[i + 1] = alpha;
+              maskImageData.data[i + 2] = alpha;
+              maskImageData.data[i + 3] = 255;
+            }
+            
+            maskCtx.putImageData(maskImageData, 0, 0);
+            
+            // Save initial mask state for undo
+            setUndoStack([maskCtx.getImageData(0, 0, width, height)]);
+          }
+          
+          setCanvasReady(true);
         } catch (error) {
           console.error("Error initializing canvas:", error);
         }
@@ -135,6 +171,14 @@ export default function BackgroundRemoval() {
       initCanvas();
     }
   }, [showEditor, processedBlob, originalBlob]);
+
+  // Redraw canvas when ready
+  useEffect(() => {
+    if (canvasReady && originalImageRef.current && processedImageRef.current) {
+      redrawCanvas();
+    }
+  }, [canvasReady]);
+
 
   // Generate composite image when background settings change
   useEffect(() => {
@@ -339,7 +383,92 @@ export default function BackgroundRemoval() {
     ctx.drawImage(tempCanvas, 0, 0);
   }, []);
 
+  // Save current mask state to undo stack
+  const saveMaskState = useCallback(() => {
+    const maskCanvas = maskCanvasRef.current;
+    if (!maskCanvas) return;
+    
+    const maskCtx = maskCanvas.getContext("2d");
+    if (!maskCtx) return;
+    
+    const maskData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+    setUndoStack(prev => {
+      const newStack = [...prev, maskData];
+      // Limit stack size
+      if (newStack.length > MAX_HISTORY_SIZE) {
+        return newStack.slice(-MAX_HISTORY_SIZE);
+      }
+      return newStack;
+    });
+    setRedoStack([]); // Clear redo stack on new action
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    const maskCanvas = maskCanvasRef.current;
+    if (!maskCanvas || undoStack.length <= 1) return;
+    
+    const maskCtx = maskCanvas.getContext("2d");
+    if (!maskCtx) return;
+    
+    // Save current state to redo stack
+    const currentState = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+    setRedoStack(prev => [...prev, currentState]);
+    
+    // Pop and apply previous state
+    const newUndoStack = [...undoStack];
+    newUndoStack.pop(); // Remove current state
+    const previousState = newUndoStack[newUndoStack.length - 1];
+    
+    if (previousState) {
+      maskCtx.putImageData(previousState, 0, 0);
+      setUndoStack(newUndoStack);
+      redrawCanvas();
+    }
+  }, [undoStack, redrawCanvas]);
+
+  const handleRedo = useCallback(() => {
+    const maskCanvas = maskCanvasRef.current;
+    if (!maskCanvas || redoStack.length === 0) return;
+    
+    const maskCtx = maskCanvas.getContext("2d");
+    if (!maskCtx) return;
+    
+    // Get the state to redo
+    const newRedoStack = [...redoStack];
+    const stateToRedo = newRedoStack.pop();
+    
+    if (stateToRedo) {
+      // Save current state to undo stack
+      const currentState = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+      setUndoStack(prev => [...prev, currentState]);
+      
+      // Apply redo state
+      maskCtx.putImageData(stateToRedo, 0, 0);
+      setRedoStack(newRedoStack);
+      redrawCanvas();
+    }
+  }, [redoStack, redrawCanvas]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    if (!showEditor) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showEditor, handleUndo, handleRedo]);
+
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    saveMaskState(); // Save state before drawing
     setIsDrawing(true);
     const coords = getCanvasCoordinates(e);
     if (coords) draw(coords.x, coords.y);
@@ -357,6 +486,7 @@ export default function BackgroundRemoval() {
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
+    saveMaskState(); // Save state before drawing
     setIsDrawing(true);
     const coords = getCanvasCoordinates(e);
     if (coords) draw(coords.x, coords.y);
@@ -981,6 +1111,24 @@ export default function BackgroundRemoval() {
                     </div>
                     
                     <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleUndo}
+                        disabled={undoStack.length <= 1}
+                        title="Undo (Ctrl+Z)"
+                      >
+                        <Undo2 className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleRedo}
+                        disabled={redoStack.length === 0}
+                        title="Redo (Ctrl+Y)"
+                      >
+                        <Redo2 className="w-4 h-4" />
+                      </Button>
                       <Button variant="outline" size="sm" onClick={handleResetMask}>
                         <RotateCcw className="w-4 h-4 mr-2" />
                         Reset
