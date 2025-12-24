@@ -422,18 +422,35 @@ export default function BackgroundRemoval() {
         toast.success("Image downloaded!");
       }, "image/png");
     } else if (compositeImage && backgroundType !== "transparent") {
-      // Download composite with background
-      const link = document.createElement("a");
-      link.href = compositeImage;
-      link.download = backgroundType === "solid" ? "background-replaced-color.png" : "background-replaced-image.png";
-      link.click();
-      toast.success("Image downloaded!");
+      // Download composite with background - need to fetch and convert to blob for proper download
+      fetch(compositeImage)
+        .then(res => res.blob())
+        .then(blob => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = backgroundType === "solid" ? "background-replaced-color.png" : "background-replaced-image.png";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          toast.success("Image downloaded!");
+        });
     } else if (processedImage) {
-      const link = document.createElement("a");
-      link.href = processedImage;
-      link.download = "background-removed.png";
-      link.click();
-      toast.success("Image downloaded!");
+      // For blob URLs, need to fetch and recreate for download
+      fetch(processedImage)
+        .then(res => res.blob())
+        .then(blob => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "background-removed.png";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          toast.success("Image downloaded!");
+        });
     }
   }, [showEditor, processedImage, compositeImage, backgroundType]);
 
