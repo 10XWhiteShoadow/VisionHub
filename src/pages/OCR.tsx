@@ -1,10 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Layout } from "@/components/Layout";
-import { WebcamView, WebcamViewRef } from "@/components/WebcamView";
 import { StatsDisplay } from "@/components/StatsDisplay";
 import { Button } from "@/components/ui/button";
 import { FileText, Camera, Copy, RefreshCw, Languages, Settings, Loader2 } from "lucide-react";
 import Tesseract from "tesseract.js";
+import Webcam from "react-webcam";
 
 const languages = [
   { code: "es", name: "Spanish", flag: "🇪🇸" },
@@ -41,7 +41,7 @@ export default function OCR() {
   const [progress, setProgress] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   
-  const webcamRef = useRef<WebcamViewRef>(null);
+  const webcamRef = useRef<Webcam>(null);
   const workerRef = useRef<Tesseract.Worker | null>(null);
 
   // Initialize Tesseract worker
@@ -63,7 +63,7 @@ export default function OCR() {
     };
   }, [ocrLang]);
 
-  // Preprocess image for better OCR
+  // Advanced image preprocessing for better OCR
   const preprocessImage = useCallback((imageData: string): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -75,31 +75,63 @@ export default function OCR() {
           return;
         }
 
-        // Scale up for better recognition
-        const scale = 2;
+        // Scale up 3x for better recognition
+        const scale = 3;
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
         
-        // Draw scaled image
+        // Use high quality scaling
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         
         // Get image data for processing
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imgData.data;
         
-        // Convert to grayscale and increase contrast
+        // Apply adaptive thresholding with Otsu's method approximation
+        let histogram = new Array(256).fill(0);
+        let totalPixels = data.length / 4;
+        
         for (let i = 0; i < data.length; i += 4) {
-          // Grayscale
+          const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+          histogram[gray]++;
+        }
+        
+        // Find optimal threshold using Otsu's method
+        let sum = 0;
+        for (let i = 0; i < 256; i++) sum += i * histogram[i];
+        
+        let sumB = 0, wB = 0, wF = 0;
+        let maxVariance = 0, threshold = 128;
+        
+        for (let t = 0; t < 256; t++) {
+          wB += histogram[t];
+          if (wB === 0) continue;
+          wF = totalPixels - wB;
+          if (wF === 0) break;
+          
+          sumB += t * histogram[t];
+          const mB = sumB / wB;
+          const mF = (sum - sumB) / wF;
+          const variance = wB * wF * (mB - mF) * (mB - mF);
+          
+          if (variance > maxVariance) {
+            maxVariance = variance;
+            threshold = t;
+          }
+        }
+        
+        // Apply threshold and enhance contrast
+        for (let i = 0; i < data.length; i += 4) {
           const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
           
-          // Increase contrast with threshold
-          const threshold = 128;
-          const contrast = 1.5;
-          const adjusted = ((gray - threshold) * contrast) + threshold;
-          const final = Math.max(0, Math.min(255, adjusted));
+          // Increase contrast
+          const contrast = 2.0;
+          const adjusted = ((gray - 128) * contrast) + 128;
           
-          // Apply binarization for cleaner text
-          const binary = final > 140 ? 255 : 0;
+          // Apply binarization with computed threshold
+          const binary = adjusted > threshold ? 255 : 0;
           
           data[i] = binary;
           data[i + 1] = binary;
@@ -107,11 +139,6 @@ export default function OCR() {
         }
         
         ctx.putImageData(imgData, 0, 0);
-        
-        // Apply sharpening
-        ctx.filter = "contrast(1.2) brightness(1.1)";
-        ctx.drawImage(canvas, 0, 0);
-        
         resolve(canvas.toDataURL("image/png"));
       };
       img.src = imageData;
@@ -120,7 +147,7 @@ export default function OCR() {
 
   // Capture image from webcam
   const captureImage = useCallback(async () => {
-    const screenshot = webcamRef.current?.capture();
+    const screenshot = webcamRef.current?.getScreenshot();
     if (screenshot) {
       setCapturedImage(screenshot);
       
@@ -308,7 +335,19 @@ export default function OCR() {
           <div className="glass-card rounded-2xl p-4">
             {!capturedImage ? (
               <>
-                <WebcamView ref={webcamRef} mirrored={false} />
+                <div className="relative aspect-video rounded-xl overflow-hidden bg-muted">
+                  <Webcam
+                    ref={webcamRef}
+                    audio={false}
+                    screenshotFormat="image/jpeg"
+                    videoConstraints={{
+                      facingMode: "environment",
+                      width: 1920,
+                      height: 1080,
+                    }}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
                 <Button
                   variant="gradient"
                   className="w-full mt-4 gap-2"
