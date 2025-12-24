@@ -116,10 +116,9 @@ export function Layout({
                     variant={moreNavItems.some(item => location.pathname === item.path) ? "default" : "ghost"}
                     size="sm"
                     className={cn(
-                      "gap-1.5 transition-all duration-300 opacity-0 animate-fade-in-down",
+                      "gap-1.5 transition-all duration-300",
                       moreNavItems.some(item => location.pathname === item.path) && "animate-pulse-glow shadow-lg"
                     )}
-                    style={{ animationDelay: `${primaryNavItems.length * 50}ms` }}
                   >
                     <MoreHorizontal className="w-4 h-4" />
                     <span className="hidden md:inline">More</span>
