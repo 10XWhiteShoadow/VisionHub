@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Link } from "react-router-dom";
 import Webcam from "react-webcam";
 import { useStudents, Student } from "@/hooks/useStudents";
 import { useAttendance } from "@/hooks/useAttendance";
+import { useAuth } from "@/hooks/useAuth";
 import {
   FaceDetector,
   FilesetResolver,
@@ -44,6 +46,8 @@ const MARK_COOLDOWN = 5000;
  * Uses automated face matching to mark attendance
  */
 const Attendance = () => {
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
