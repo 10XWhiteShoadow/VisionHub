@@ -71,135 +71,166 @@ export default function BackgroundRemoval() {
 
   // Initialize canvas when entering editor mode
   useEffect(() => {
-    if (showEditor && processedBlob && originalBlob && canvasRef.current && maskCanvasRef.current) {
+    console.log("Canvas effect triggered:", { 
+      showEditor, 
+      hasProcessedBlob: !!processedBlob, 
+      hasOriginalBlob: !!originalBlob,
+      hasCanvasRef: !!canvasRef.current,
+      hasMaskCanvasRef: !!maskCanvasRef.current
+    });
+    
+    if (!showEditor || !processedBlob || !originalBlob) {
+      return;
+    }
+    
+    // Small delay to ensure canvas is mounted
+    const timeoutId = setTimeout(async () => {
       const canvas = canvasRef.current;
       const maskCanvas = maskCanvasRef.current;
+      
+      console.log("After timeout - Canvas refs:", { hasCanvas: !!canvas, hasMaskCanvas: !!maskCanvas });
+      
+      if (!canvas || !maskCanvas) {
+        console.error("Canvas refs not available");
+        return;
+      }
+      
       const ctx = canvas.getContext("2d");
       const maskCtx = maskCanvas.getContext("2d");
       
-      if (!ctx || !maskCtx) return;
+      if (!ctx || !maskCtx) {
+        console.error("Canvas contexts not available");
+        return;
+      }
 
       setCanvasReady(false);
       setUndoStack([]);
       setRedoStack([]);
 
       // Use createImageBitmap to avoid canvas tainting issues with blob URLs
-      const initCanvas = async () => {
-        try {
-          const processedBitmap = await createImageBitmap(processedBlob);
-          const originalBitmap = await createImageBitmap(originalBlob);
-          
-          // Set canvas size
-          const maxSize = 600;
-          let width = processedBitmap.width;
-          let height = processedBitmap.height;
-          
-          if (width > maxSize || height > maxSize) {
-            if (width > height) {
-              height = (height / width) * maxSize;
-              width = maxSize;
-            } else {
-              width = (width / height) * maxSize;
-              height = maxSize;
-            }
+      try {
+        console.log("Creating bitmaps from blobs...");
+        const processedBitmap = await createImageBitmap(processedBlob);
+        const originalBitmap = await createImageBitmap(originalBlob);
+        console.log("Bitmaps created:", { 
+          processedWidth: processedBitmap.width, 
+          processedHeight: processedBitmap.height,
+          originalWidth: originalBitmap.width,
+          originalHeight: originalBitmap.height
+        });
+        
+        // Set canvas size
+        const maxSize = 600;
+        let width = processedBitmap.width;
+        let height = processedBitmap.height;
+        
+        if (width > maxSize || height > maxSize) {
+          if (width > height) {
+            height = (height / width) * maxSize;
+            width = maxSize;
+          } else {
+            width = (width / height) * maxSize;
+            height = maxSize;
           }
-          
-          canvas.width = width;
-          canvas.height = height;
-          maskCanvas.width = width;
-          maskCanvas.height = height;
-          
-          // Create original image from bitmap first
-          const origCanvas = document.createElement("canvas");
-          origCanvas.width = width;
-          origCanvas.height = height;
-          const origCtx = origCanvas.getContext("2d");
-          if (origCtx) {
-            origCtx.drawImage(originalBitmap, 0, 0, width, height);
-            const origDataUrl = origCanvas.toDataURL("image/png");
-            const origImg = new Image();
-            await new Promise<void>((resolve) => {
-              origImg.onload = () => {
-                originalImageRef.current = origImg;
-                resolve();
-              };
-              origImg.src = origDataUrl;
-            });
-          }
-          
-          // Create processed image from bitmap
-          const procCanvas = document.createElement("canvas");
-          procCanvas.width = width;
-          procCanvas.height = height;
-          const procCtx = procCanvas.getContext("2d");
-          if (procCtx) {
-            procCtx.drawImage(processedBitmap, 0, 0, width, height);
-            const procDataUrl = procCanvas.toDataURL("image/png");
-            const procImg = new Image();
-            await new Promise<void>((resolve) => {
-              procImg.onload = () => {
-                processedImageRef.current = procImg;
-                resolve();
-              };
-              procImg.src = procDataUrl;
-            });
-            
-            // Initialize mask from processed image alpha
-            const procImageData = procCtx.getImageData(0, 0, width, height);
-            const maskImageData = maskCtx.createImageData(width, height);
-            
-            for (let i = 0; i < procImageData.data.length; i += 4) {
-              const alpha = procImageData.data[i + 3];
-              maskImageData.data[i] = alpha;
-              maskImageData.data[i + 1] = alpha;
-              maskImageData.data[i + 2] = alpha;
-              maskImageData.data[i + 3] = 255;
-            }
-            
-            maskCtx.putImageData(maskImageData, 0, 0);
-            
-            // Save initial mask state for undo
-            setUndoStack([maskCtx.getImageData(0, 0, width, height)]);
-            
-            // Draw the initial image on the main canvas
-            // Clear and draw checkerboard
-            ctx.clearRect(0, 0, width, height);
-            const patternSize = 10;
-            for (let i = 0; i < width; i += patternSize) {
-              for (let j = 0; j < height; j += patternSize) {
-                ctx.fillStyle = ((i + j) / patternSize) % 2 === 0 ? "#e0e0e0" : "#ffffff";
-                ctx.fillRect(i, j, patternSize, patternSize);
-              }
-            }
-            
-            // Apply mask to original image and draw
-            const finalCanvas = document.createElement("canvas");
-            finalCanvas.width = width;
-            finalCanvas.height = height;
-            const finalCtx = finalCanvas.getContext("2d");
-            if (finalCtx) {
-              finalCtx.drawImage(originalBitmap, 0, 0, width, height);
-              const finalImageData = finalCtx.getImageData(0, 0, width, height);
-              const maskDataForDraw = maskCtx.getImageData(0, 0, width, height);
-              
-              for (let i = 0; i < finalImageData.data.length; i += 4) {
-                const maskValue = maskDataForDraw.data[i];
-                finalImageData.data[i + 3] = maskValue;
-              }
-              
-              finalCtx.putImageData(finalImageData, 0, 0);
-              ctx.drawImage(finalCanvas, 0, 0);
-            }
-          }
-          
-          setCanvasReady(true);
-        } catch (error) {
-          console.error("Error initializing canvas:", error);
         }
-      };
-      
-      initCanvas();
-    }
+        
+        console.log("Setting canvas dimensions:", { width, height });
+        canvas.width = width;
+        canvas.height = height;
+        maskCanvas.width = width;
+        maskCanvas.height = height;
+        
+        // Create original image from bitmap first
+        const origCanvas = document.createElement("canvas");
+        origCanvas.width = width;
+        origCanvas.height = height;
+        const origCtx = origCanvas.getContext("2d");
+        if (origCtx) {
+          origCtx.drawImage(originalBitmap, 0, 0, width, height);
+          const origDataUrl = origCanvas.toDataURL("image/png");
+          const origImg = new Image();
+          await new Promise<void>((resolve) => {
+            origImg.onload = () => {
+              originalImageRef.current = origImg;
+              resolve();
+            };
+            origImg.src = origDataUrl;
+          });
+        }
+        
+        // Create processed image from bitmap
+        const procCanvas = document.createElement("canvas");
+        procCanvas.width = width;
+        procCanvas.height = height;
+        const procCtx = procCanvas.getContext("2d");
+        if (procCtx) {
+          procCtx.drawImage(processedBitmap, 0, 0, width, height);
+          const procDataUrl = procCanvas.toDataURL("image/png");
+          const procImg = new Image();
+          await new Promise<void>((resolve) => {
+            procImg.onload = () => {
+              processedImageRef.current = procImg;
+              resolve();
+            };
+            procImg.src = procDataUrl;
+          });
+          
+          // Initialize mask from processed image alpha
+          const procImageData = procCtx.getImageData(0, 0, width, height);
+          const maskImageData = maskCtx.createImageData(width, height);
+          
+          for (let i = 0; i < procImageData.data.length; i += 4) {
+            const alpha = procImageData.data[i + 3];
+            maskImageData.data[i] = alpha;
+            maskImageData.data[i + 1] = alpha;
+            maskImageData.data[i + 2] = alpha;
+            maskImageData.data[i + 3] = 255;
+          }
+          
+          maskCtx.putImageData(maskImageData, 0, 0);
+          
+          // Save initial mask state for undo
+          setUndoStack([maskCtx.getImageData(0, 0, width, height)]);
+          
+          // Draw the initial image on the main canvas
+          // Clear and draw checkerboard
+          ctx.clearRect(0, 0, width, height);
+          const patternSize = 10;
+          for (let i = 0; i < width; i += patternSize) {
+            for (let j = 0; j < height; j += patternSize) {
+              ctx.fillStyle = ((i + j) / patternSize) % 2 === 0 ? "#e0e0e0" : "#ffffff";
+              ctx.fillRect(i, j, patternSize, patternSize);
+            }
+          }
+          
+          // Apply mask to original image and draw
+          const finalCanvas = document.createElement("canvas");
+          finalCanvas.width = width;
+          finalCanvas.height = height;
+          const finalCtx = finalCanvas.getContext("2d");
+          if (finalCtx) {
+            finalCtx.drawImage(originalBitmap, 0, 0, width, height);
+            const finalImageData = finalCtx.getImageData(0, 0, width, height);
+            const maskDataForDraw = maskCtx.getImageData(0, 0, width, height);
+            
+            for (let i = 0; i < finalImageData.data.length; i += 4) {
+              const maskValue = maskDataForDraw.data[i];
+              finalImageData.data[i + 3] = maskValue;
+            }
+            
+            finalCtx.putImageData(finalImageData, 0, 0);
+            ctx.drawImage(finalCanvas, 0, 0);
+            console.log("Canvas drawing complete");
+          }
+        }
+        
+        setCanvasReady(true);
+      } catch (error) {
+        console.error("Error initializing canvas:", error);
+      }
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [showEditor, processedBlob, originalBlob]);
 
   // Redraw canvas when ready
