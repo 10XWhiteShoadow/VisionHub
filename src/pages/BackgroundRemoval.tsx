@@ -160,6 +160,36 @@ export default function BackgroundRemoval() {
             
             // Save initial mask state for undo
             setUndoStack([maskCtx.getImageData(0, 0, width, height)]);
+            
+            // Draw the initial image on the main canvas
+            // Clear and draw checkerboard
+            ctx.clearRect(0, 0, width, height);
+            const patternSize = 10;
+            for (let i = 0; i < width; i += patternSize) {
+              for (let j = 0; j < height; j += patternSize) {
+                ctx.fillStyle = ((i + j) / patternSize) % 2 === 0 ? "#e0e0e0" : "#ffffff";
+                ctx.fillRect(i, j, patternSize, patternSize);
+              }
+            }
+            
+            // Apply mask to original image and draw
+            const finalCanvas = document.createElement("canvas");
+            finalCanvas.width = width;
+            finalCanvas.height = height;
+            const finalCtx = finalCanvas.getContext("2d");
+            if (finalCtx) {
+              finalCtx.drawImage(originalBitmap, 0, 0, width, height);
+              const finalImageData = finalCtx.getImageData(0, 0, width, height);
+              const maskDataForDraw = maskCtx.getImageData(0, 0, width, height);
+              
+              for (let i = 0; i < finalImageData.data.length; i += 4) {
+                const maskValue = maskDataForDraw.data[i];
+                finalImageData.data[i + 3] = maskValue;
+              }
+              
+              finalCtx.putImageData(finalImageData, 0, 0);
+              ctx.drawImage(finalCanvas, 0, 0);
+            }
           }
           
           setCanvasReady(true);
