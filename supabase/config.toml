@@ -1,1 +1,4 @@
 project_id = "tuohpmgvthmqsldmthbt"
+
+[functions.ocr-process]
+verify_jwt = false
