@@ -12,6 +12,7 @@ import PoseEstimation from "./pages/PoseEstimation";
 import OCR from "./pages/OCR";
 import Attendance from "./pages/Attendance";
 import StudentManagement from "./pages/StudentManagement";
+import BackgroundRemoval from "./pages/BackgroundRemoval";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/object-detection" element={<ObjectDetection />} />
             <Route path="/pose-estimation" element={<PoseEstimation />} />
             <Route path="/ocr" element={<OCR />} />
+            <Route path="/background-removal" element={<BackgroundRemoval />} />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/attendance/students" element={<StudentManagement />} />
             <Route path="/auth" element={<Auth />} />
