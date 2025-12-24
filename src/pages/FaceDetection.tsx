@@ -5,7 +5,7 @@ import { StatsDisplay } from "@/components/StatsDisplay";
 import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
 import { Scan, Play, Pause, RefreshCw } from "lucide-react";
-import * as faceapi from "face-api.js";
+import * as faceapi from "@vladmandic/face-api";
 
 // Emotion labels
 const EMOTIONS = ["Happy", "Sad", "Angry", "Fearful", "Disgusted", "Surprised", "Neutral"] as const;

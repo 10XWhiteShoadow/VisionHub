@@ -52,26 +52,44 @@ export default function ObjectDetection() {
 
   // Initialize COCO-SSD model
   useEffect(() => {
+    let mounted = true;
+    
     const initModel = async () => {
       try {
+        // Ensure TensorFlow is ready with fallback backends
         await tf.ready();
-        await tf.setBackend('webgl');
-        modelRef.current = await cocoSsd.load({
+        
+        // Try webgl first, fallback to cpu if needed
+        try {
+          await tf.setBackend('webgl');
+        } catch {
+          console.warn('WebGL backend failed, falling back to CPU');
+          await tf.setBackend('cpu');
+        }
+        
+        // Load COCO-SSD model
+        const model = await cocoSsd.load({
           base: "lite_mobilenet_v2",
         });
         
-        setIsLoading(false);
-        setIsRunning(true);
+        if (mounted) {
+          modelRef.current = model;
+          setIsLoading(false);
+          setIsRunning(true);
+        }
       } catch (err) {
         console.error("Failed to initialize COCO-SSD:", err);
-        setError("Failed to load object detection model. Please refresh and try again.");
-        setIsLoading(false);
+        if (mounted) {
+          setError("Failed to load object detection model. Please refresh and try again.");
+          setIsLoading(false);
+        }
       }
     };
 
     initModel();
 
     return () => {
+      mounted = false;
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
