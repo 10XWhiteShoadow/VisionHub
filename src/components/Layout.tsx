@@ -1,44 +1,35 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Home, Scan, Hand, Package, Activity, FileText, Github, UserCheck, Eye, Eraser } from "lucide-react";
+import { Home, Scan, Hand, Package, Activity, FileText, Github, UserCheck, Eye, Eraser, MoreHorizontal, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 interface LayoutProps {
   children: ReactNode;
 }
-const navItems = [{
-  path: "/",
-  icon: Home,
-  label: "Home"
-}, {
-  path: "/face-detection",
-  icon: Scan,
-  label: "Face"
-}, {
-  path: "/hand-gesture",
-  icon: Hand,
-  label: "Hands"
-}, {
-  path: "/object-detection",
-  icon: Package,
-  label: "Objects"
-}, {
-  path: "/pose-estimation",
-  icon: Activity,
-  label: "Pose"
-}, {
-  path: "/ocr",
-  icon: FileText,
-  label: "OCR"
-}, {
-  path: "/background-removal",
-  icon: Eraser,
-  label: "BG Remove"
-}, {
-  path: "/attendance",
-  icon: UserCheck,
-  label: "Attendance"
-}];
+
+// Primary nav items (first 3 features)
+const primaryNavItems = [
+  { path: "/", icon: Home, label: "Home" },
+  { path: "/face-detection", icon: Scan, label: "Face" },
+  { path: "/hand-gesture", icon: Hand, label: "Hands" },
+];
+
+// Items in the "More" dropdown
+const moreNavItems = [
+  { path: "/object-detection", icon: Package, label: "Object Detection" },
+  { path: "/pose-estimation", icon: Activity, label: "Pose Estimation" },
+  { path: "/ocr", icon: FileText, label: "OCR" },
+  { path: "/background-removal", icon: Eraser, label: "Background Removal" },
+  { path: "/attendance", icon: UserCheck, label: "Attendance" },
+];
 
 /**
  * Main layout component with navigation
@@ -91,18 +82,77 @@ export function Layout({
 
             {/* Navigation links with stagger animation */}
             <div className="flex items-center gap-1">
-              {navItems.map((item, index) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              return <Link key={item.path} to={item.path} className="opacity-0 animate-fade-in-down" style={{
-                animationDelay: `${index * 50}ms`
-              }}>
-                    <Button variant={isActive ? "default" : "ghost"} size="sm" className={cn("gap-1.5 transition-all duration-300", isActive && "animate-pulse-glow shadow-lg", !isActive && "hover:scale-105 hover:bg-primary/10")}>
+              {/* Primary nav items */}
+              {primaryNavItems.map((item, index) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className="opacity-0 animate-fade-in-down"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <Button
+                      variant={isActive ? "default" : "ghost"}
+                      size="sm"
+                      className={cn(
+                        "gap-1.5 transition-all duration-300",
+                        isActive && "animate-pulse-glow shadow-lg",
+                        !isActive && "hover:scale-105 hover:bg-primary/10"
+                      )}
+                    >
                       <Icon className={cn("w-4 h-4 transition-transform duration-300", !isActive && "group-hover:rotate-12")} />
                       <span className="hidden md:inline">{item.label}</span>
                     </Button>
-                  </Link>;
-            })}
+                  </Link>
+                );
+              })}
+
+              {/* More dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant={moreNavItems.some(item => location.pathname === item.path) ? "default" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "gap-1.5 transition-all duration-300 opacity-0 animate-fade-in-down",
+                      moreNavItems.some(item => location.pathname === item.path) && "animate-pulse-glow shadow-lg"
+                    )}
+                    style={{ animationDelay: `${primaryNavItems.length * 50}ms` }}
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                    <span className="hidden md:inline">More</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 bg-background border border-border z-50">
+                  {moreNavItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = location.pathname === item.path;
+                    return (
+                      <DropdownMenuItem key={item.path} asChild>
+                        <Link
+                          to={item.path}
+                          className={cn(
+                            "flex items-center gap-2 cursor-pointer",
+                            isActive && "bg-primary/10 text-primary"
+                          )}
+                        >
+                          <Icon className="w-4 h-4" />
+                          {item.label}
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-3 text-center">
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+                      <Sparkles className="w-4 h-4" />
+                      <span>More features coming soon</span>
+                    </div>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* GitHub link */}
