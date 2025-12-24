@@ -1,4 +1,4 @@
-import { Scan, Hand, Package, Activity, FileText, Sparkles, Zap, Shield, ChevronDown, UserCheck } from "lucide-react";
+import { Scan, Hand, Package, Activity, FileText, Sparkles, Zap, Shield, ChevronDown, UserCheck, ImageMinus } from "lucide-react";
 import { FeatureCard } from "@/components/FeatureCard";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -32,6 +32,12 @@ const features = [{
   icon: FileText,
   path: "/ocr",
   color: "orange" as const
+}, {
+  title: "Background Removal",
+  description: "Remove backgrounds from images using AI-powered segmentation with brush refinement tools.",
+  icon: ImageMinus,
+  path: "/background-removal",
+  color: "purple" as const
 }, {
   title: "Attendance Management",
   description: "Smart attendance system using face recognition. Track students and sync to Google Sheets.",
@@ -86,7 +92,7 @@ export default function Index() {
             {/* Badge with bounce animation */}
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 backdrop-blur border border-border/50 mb-8 ${mounted ? 'animate-scale-in-bounce' : 'opacity-0'}`}>
               <Sparkles className="w-4 h-4 text-primary animate-spin-slow" />
-              <span className="text-sm font-medium text-muted-foreground">6 Interactive Computer Vision Demos</span>
+              <span className="text-sm font-medium text-muted-foreground">7 Interactive Computer Vision Demos</span>
             </div>
 
             {/* Main heading with staggered animation */}
