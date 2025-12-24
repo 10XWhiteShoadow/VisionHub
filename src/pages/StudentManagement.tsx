@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useStudents } from "@/hooks/useStudents";
+import { Link, useNavigate } from "react-router-dom";
 import Webcam from "react-webcam";
 import {
   UserPlus,
@@ -18,50 +20,50 @@ import {
   X,
   CheckCircle2,
   Edit2,
-  Save,
   Sparkles,
+  Loader2,
+  LogOut,
 } from "lucide-react";
+import { useEffect } from "react";
 
-interface Student {
-  id: string;
-  name: string;
-  rollNo: string;
-  imageData?: string;
-  addedAt: string;
-}
-
-/**
- * Student Management Page
- * Add, edit, and remove students for attendance tracking
- */
 const StudentManagement = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
+  const { students, loading: studentsLoading, addStudent, updateStudent, deleteStudent } = useStudents();
+  
   const webcamRef = useRef<Webcam>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const [students, setStudents] = useState<Student[]>([]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Form state
   const [newName, setNewName] = useState("");
   const [newRollNo, setNewRollNo] = useState("");
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
 
-  // Load students from localStorage
+  // Redirect if not authenticated
   useEffect(() => {
-    const savedStudents = localStorage.getItem("visionhub-students");
-    if (savedStudents) {
-      setStudents(JSON.parse(savedStudents));
+    if (!authLoading && !user) {
+      navigate("/auth");
     }
-  }, []);
+  }, [user, authLoading, navigate]);
 
-  // Save students to localStorage
-  const saveStudents = (updatedStudents: Student[]) => {
-    localStorage.setItem("visionhub-students", JSON.stringify(updatedStudents));
-    setStudents(updatedStudents);
+  // Convert data URL to Blob
+  const dataURLtoBlob = (dataURL: string): Blob => {
+    const arr = dataURL.split(",");
+    const mime = arr[0].match(/:(.*?);/)?.[1] || "image/jpeg";
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
   };
 
   // Capture photo from webcam
@@ -86,7 +88,7 @@ const StudentManagement = () => {
   };
 
   // Add new student
-  const addStudent = () => {
+  const handleAddStudent = async () => {
     if (!newName.trim() || !newRollNo.trim()) {
       toast({
         title: "Missing Information",
@@ -96,69 +98,70 @@ const StudentManagement = () => {
       return;
     }
 
-    const existingRoll = students.find((s) => s.rollNo === newRollNo);
-    if (existingRoll) {
+    setIsSubmitting(true);
+    const imageBlob = capturedImage ? dataURLtoBlob(capturedImage) : undefined;
+    const result = await addStudent(newName.trim(), newRollNo.trim(), imageBlob);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      resetForm();
+      setShowAddModal(false);
       toast({
-        title: "Duplicate Roll Number",
-        description: "A student with this roll number already exists",
+        title: "Student Added!",
+        description: `${newName} has been added successfully`,
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to add student",
         variant: "destructive",
       });
-      return;
     }
-
-    const newStudent: Student = {
-      id: Date.now().toString(),
-      name: newName.trim(),
-      rollNo: newRollNo.trim(),
-      imageData: capturedImage || undefined,
-      addedAt: new Date().toISOString(),
-    };
-
-    saveStudents([...students, newStudent]);
-    resetForm();
-    setShowAddModal(false);
-
-    toast({
-      title: "Student Added! 🎉",
-      description: `${newStudent.name} has been added successfully`,
-    });
   };
 
   // Update existing student
-  const updateStudent = () => {
-    if (!editingStudent) return;
+  const handleUpdateStudent = async () => {
+    if (!editingStudentId || !newName.trim() || !newRollNo.trim()) return;
 
-    const updatedStudents = students.map((s) =>
-      s.id === editingStudent.id
-        ? {
-            ...s,
-            name: newName.trim() || s.name,
-            rollNo: newRollNo.trim() || s.rollNo,
-            imageData: capturedImage || s.imageData,
-          }
-        : s
-    );
+    setIsSubmitting(true);
+    const imageBlob = capturedImage?.startsWith("data:") ? dataURLtoBlob(capturedImage) : undefined;
+    const result = await updateStudent(editingStudentId, newName.trim(), newRollNo.trim(), imageBlob);
+    setIsSubmitting(false);
 
-    saveStudents(updatedStudents);
-    resetForm();
-    setEditingStudent(null);
-
-    toast({
-      title: "Student Updated! ✓",
-      description: "Changes saved successfully",
-    });
+    if (result.success) {
+      resetForm();
+      setEditingStudentId(null);
+      setShowAddModal(false);
+      toast({
+        title: "Student Updated!",
+        description: "Changes saved successfully",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to update student",
+        variant: "destructive",
+      });
+    }
   };
 
   // Delete student
-  const deleteStudent = (id: string) => {
+  const handleDeleteStudent = async (id: string) => {
     const student = students.find((s) => s.id === id);
-    const updatedStudents = students.filter((s) => s.id !== id);
-    saveStudents(updatedStudents);
+    const result = await deleteStudent(id);
 
-    toast({
-      title: "Student Removed",
-      description: `${student?.name} has been removed`,
-    });
+    if (result.success) {
+      toast({
+        title: "Student Removed",
+        description: `${student?.name} has been removed`,
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to remove student",
+        variant: "destructive",
+      });
+    }
   };
 
   // Reset form
@@ -170,12 +173,18 @@ const StudentManagement = () => {
   };
 
   // Start editing
-  const startEditing = (student: Student) => {
-    setEditingStudent(student);
+  const startEditing = (student: { id: string; name: string; rollNo: string; imageUrl?: string }) => {
+    setEditingStudentId(student.id);
     setNewName(student.name);
     setNewRollNo(student.rollNo);
-    setCapturedImage(student.imageData || null);
+    setCapturedImage(student.imageUrl || null);
     setShowAddModal(true);
+  };
+
+  // Handle sign out
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth");
   };
 
   // Filter students
@@ -185,16 +194,34 @@ const StudentManagement = () => {
       s.rollNo.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (authLoading || studentsLoading) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-neon-purple" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!user) return null;
+
   return (
     <Layout>
       <div className="min-h-screen bg-background pt-20 pb-12">
         <div className="container mx-auto px-4 max-w-5xl">
           {/* Header */}
           <div className="mb-8 animate-fade-in-up">
-            <Link to="/attendance" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4 group">
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              Back to Attendance
-            </Link>
+            <div className="flex items-center justify-between mb-4">
+              <Link to="/attendance" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group">
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                Back to Attendance
+              </Link>
+              <Button variant="outline" size="sm" onClick={handleSignOut} className="gap-2">
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </Button>
+            </div>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <h1 className="text-3xl md:text-4xl font-bold mb-2">
@@ -207,7 +234,7 @@ const StudentManagement = () => {
               <Button
                 onClick={() => {
                   resetForm();
-                  setEditingStudent(null);
+                  setEditingStudentId(null);
                   setShowAddModal(true);
                 }}
                 className="gap-2 bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90 hover-lift"
@@ -260,9 +287,9 @@ const StudentManagement = () => {
                   <div className="flex items-start gap-4">
                     {/* Avatar */}
                     <div className="relative">
-                      {student.imageData ? (
+                      {student.imageUrl ? (
                         <img
-                          src={student.imageData}
+                          src={student.imageUrl}
                           alt={student.name}
                           className="w-16 h-16 rounded-xl object-cover border-2 border-neon-purple/30"
                         />
@@ -287,7 +314,7 @@ const StudentManagement = () => {
                         Roll: {student.rollNo}
                       </p>
                       <p className="text-xs text-muted-foreground/60 mt-1">
-                        Added {new Date(student.addedAt).toLocaleDateString()}
+                        Added {new Date(student.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
@@ -306,7 +333,7 @@ const StudentManagement = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => deleteStudent(student.id)}
+                      onClick={() => handleDeleteStudent(student.id)}
                       className="gap-2 hover:border-neon-pink/50 hover:bg-neon-pink/5 hover:text-neon-pink"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -347,7 +374,7 @@ const StudentManagement = () => {
               onClick={() => {
                 setShowAddModal(false);
                 resetForm();
-                setEditingStudent(null);
+                setEditingStudentId(null);
               }}
             />
             <Card className="relative z-10 w-full max-w-md glass-card p-6 animate-scale-in-bounce">
@@ -356,7 +383,7 @@ const StudentManagement = () => {
                 onClick={() => {
                   setShowAddModal(false);
                   resetForm();
-                  setEditingStudent(null);
+                  setEditingStudentId(null);
                 }}
                 className="absolute top-4 right-4 p-2 rounded-lg hover:bg-muted transition-colors"
               >
@@ -364,7 +391,7 @@ const StudentManagement = () => {
               </button>
 
               <h2 className="text-2xl font-bold mb-6">
-                {editingStudent ? "Edit Student" : "Add New Student"}
+                {editingStudentId ? "Edit Student" : "Add New Student"}
               </h2>
 
               <div className="space-y-5">
@@ -470,17 +497,20 @@ const StudentManagement = () => {
 
                 {/* Submit Button */}
                 <Button
-                  onClick={editingStudent ? updateStudent : addStudent}
-                  className="w-full gap-2 h-12 text-lg bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90"
+                  onClick={editingStudentId ? handleUpdateStudent : handleAddStudent}
+                  disabled={isSubmitting}
+                  className="w-full gap-2 bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90"
                 >
-                  {editingStudent ? (
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : editingStudentId ? (
                     <>
-                      <Save className="w-5 h-5" />
-                      Save Changes
+                      <Edit2 className="w-4 h-4" />
+                      Update Student
                     </>
                   ) : (
                     <>
-                      <UserPlus className="w-5 h-5" />
+                      <UserPlus className="w-4 h-4" />
                       Add Student
                     </>
                   )}
