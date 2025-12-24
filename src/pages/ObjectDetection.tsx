@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Layout } from "@/components/Layout";
-import { WebcamView, WebcamViewRef } from "@/components/WebcamView";
 import { StatsDisplay } from "@/components/StatsDisplay";
 import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
 import { Package, Play, Pause, RefreshCw, Target, CheckCircle } from "lucide-react";
 import * as tf from "@tensorflow/tfjs";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
+import Webcam from "react-webcam";
 
 interface Detection {
   bbox: [number, number, number, number];
@@ -43,7 +43,7 @@ export default function ObjectDetection() {
   const [foundItems, setFoundItems] = useState<Set<string>>(new Set());
   const [huntItems, setHuntItems] = useState<typeof scavengerItems>([]);
   
-  const webcamRef = useRef<WebcamViewRef>(null);
+  const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const modelRef = useRef<cocoSsd.ObjectDetection | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -55,6 +55,7 @@ export default function ObjectDetection() {
     const initModel = async () => {
       try {
         await tf.ready();
+        await tf.setBackend('webgl');
         modelRef.current = await cocoSsd.load({
           base: "lite_mobilenet_v2",
         });
@@ -79,7 +80,7 @@ export default function ObjectDetection() {
 
   // Process frame for object detection
   const processFrame = useCallback(async () => {
-    const video = webcamRef.current?.getVideo();
+    const video = webcamRef.current?.video;
     const canvas = canvasRef.current;
     const model = modelRef.current;
 
@@ -261,17 +262,28 @@ export default function ObjectDetection() {
           {/* Webcam view */}
           <div className="lg:col-span-2">
             <div className="glass-card rounded-2xl p-4">
-              <WebcamView
-                ref={webcamRef}
-                isProcessing={isRunning}
-                error={error}
-                mirrored={false}
-              >
-                <canvas
-                  ref={canvasRef}
+              <div className="relative aspect-video rounded-xl overflow-hidden bg-muted">
+                <Webcam
+                  ref={webcamRef}
+                  audio={false}
+                  screenshotFormat="image/jpeg"
+                  videoConstraints={{
+                    facingMode: "user",
+                    width: 1280,
+                    height: 720,
+                  }}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
-              </WebcamView>
+                <canvas
+                  ref={canvasRef}
+                  className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                />
+                {error && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 text-destructive p-4 text-center">
+                    {error}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
