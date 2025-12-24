@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import Webcam from "react-webcam";
+import { useStudents, Student } from "@/hooks/useStudents";
 import {
   FaceDetector,
   FilesetResolver,
@@ -27,13 +28,6 @@ import {
   Zap,
   Shield
 } from "lucide-react";
-
-interface Student {
-  id: string;
-  name: string;
-  rollNo: string;
-  imageData?: string;
-}
 
 interface AttendanceRecord {
   studentId: string;
@@ -66,10 +60,11 @@ const Attendance = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const matchCanvasRef = useRef<HTMLCanvasElement>(null);
   
+  const { students, loading: studentsLoading } = useStudents();
+  
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [faceDetector, setFaceDetector] = useState<FaceDetector | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [students, setStudents] = useState<Student[]>([]);
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [detectedFaces, setDetectedFaces] = useState(0);
@@ -82,14 +77,6 @@ const Attendance = () => {
   const lastMarkTimeRef = useRef<Record<string, number>>({});
   const faceHistoryRef = useRef<number[]>([]);
   const matchHistoryRef = useRef<{ studentId: string; confidence: number }[]>([]);
-
-  // Load students from localStorage
-  useEffect(() => {
-    const savedStudents = localStorage.getItem("visionhub-students");
-    if (savedStudents) {
-      setStudents(JSON.parse(savedStudents));
-    }
-  }, []);
 
   // Initialize MediaPipe Face Detector
   useEffect(() => {
@@ -123,7 +110,7 @@ const Attendance = () => {
   }, [toast]);
 
   // Compare two face images and return similarity score (0-1)
-  const compareFaces = useCallback((capturedFace: ImageData, storedImage: string): Promise<number> => {
+  const compareFaces = useCallback((capturedFace: ImageData, storedImageUrl: string): Promise<number> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
@@ -181,7 +168,7 @@ const Attendance = () => {
         resolve(similarity);
       };
       img.onerror = () => resolve(0);
-      img.src = storedImage;
+      img.src = storedImageUrl;
     });
   }, []);
 
@@ -230,16 +217,16 @@ const Attendance = () => {
 
   // Find best matching student for detected face
   const findBestMatch = useCallback(async (faceRegion: ImageData): Promise<FaceMatch | null> => {
-    const studentsWithImages = students.filter(s => s.imageData);
+    const studentsWithImages = students.filter(s => s.imageUrl);
     if (studentsWithImages.length === 0) return null;
     
     let bestMatch: FaceMatch | null = null;
     let bestConfidence = 0;
     
     for (const student of studentsWithImages) {
-      if (!student.imageData) continue;
+      if (!student.imageUrl) continue;
       
-      const confidence = await compareFaces(faceRegion, student.imageData);
+      const confidence = await compareFaces(faceRegion, student.imageUrl);
       if (confidence > bestConfidence) {
         bestConfidence = confidence;
         bestMatch = { student, confidence };
@@ -378,7 +365,7 @@ const Attendance = () => {
         ctx.stroke();
 
         // Auto-match for first detected face
-        if (i === 0 && autoMode && !isMatching && students.some(s => s.imageData)) {
+        if (i === 0 && autoMode && !isMatching && students.some(s => s.imageUrl)) {
           setIsMatching(true);
           
           // Extract face region
@@ -501,10 +488,9 @@ const Attendance = () => {
 
       window.open(GOOGLE_SHEET_URL, "_blank");
     } catch (error) {
-      console.error("Submission error:", error);
       toast({
-        title: "Submission Failed",
-        description: "Could not submit to Google Sheets",
+        title: "Error",
+        description: "Failed to submit attendance",
         variant: "destructive",
       });
     } finally {
@@ -519,300 +505,233 @@ const Attendance = () => {
     day: "numeric",
   });
 
-  const unmarkedStudents = students.filter(
-    (s) => !todayAttendance.some((r) => r.studentId === s.id)
-  );
+  const presentCount = todayAttendance.length;
+  const totalStudents = students.length;
 
-  const studentsWithPhotos = students.filter(s => s.imageData).length;
+  if (isModelLoading || studentsLoading) {
+    return (
+      <Layout>
+        <LoadingState
+          message="Loading Attendance System"
+          subMessage="Initializing face detection and loading students..."
+        />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
       <div className="min-h-screen bg-background pt-20 pb-12">
-        {/* Hidden canvas for face matching */}
-        <canvas ref={matchCanvasRef} className="hidden" />
-        
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 max-w-6xl">
           {/* Header */}
-          <div className="text-center mb-8 animate-fade-in-up">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neon-cyan/10 border border-neon-cyan/30 mb-4">
-              <UserCheck className="w-4 h-4 text-neon-cyan" />
-              <span className="text-sm text-neon-cyan font-medium">Smart Attendance</span>
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              <span className="text-gradient-cyan">Automated</span> Attendance
-            </h1>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Face recognition automatically identifies and marks students present
-            </p>
-            <div className="flex items-center justify-center gap-2 mt-4 text-muted-foreground">
-              <Calendar className="w-4 h-4" />
-              <span>{today}</span>
+          <div className="mb-8 animate-fade-in-up">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold mb-2">
+                  <span className="text-gradient-purple">Smart</span> Attendance
+                </h1>
+                <div className="flex items-center gap-4 text-muted-foreground">
+                  <span className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    {today}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    {new Date().toLocaleTimeString()}
+                  </span>
+                </div>
+              </div>
+              <Link to="/attendance/students">
+                <Button
+                  variant="outline"
+                  className="gap-2 hover:border-neon-purple/50"
+                >
+                  <Users className="w-4 h-4" />
+                  Manage Students
+                </Button>
+              </Link>
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-6">
-            {/* Main Webcam Area */}
-            <div className="lg:col-span-2 space-y-4">
-              <Card className="glass-card p-6 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
-                {isModelLoading ? (
-                  <LoadingState message="Loading Face Detection Model..." />
-                ) : (
-                  <div className="space-y-4">
-                    {/* Auto Mode Toggle */}
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                          autoMode ? "bg-neon-green/20" : "bg-muted"
-                        }`}>
-                          <Zap className={`w-5 h-5 ${autoMode ? "text-neon-green" : "text-muted-foreground"}`} />
-                        </div>
-                        <div>
-                          <p className="font-medium">Auto Recognition</p>
-                          <p className="text-xs text-muted-foreground">
-                            {studentsWithPhotos > 0 
-                              ? `${studentsWithPhotos} students with photos` 
-                              : "Add student photos to enable"}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant={autoMode ? "neon" : "outline"}
-                        size="sm"
-                        onClick={() => setAutoMode(!autoMode)}
-                        disabled={studentsWithPhotos === 0}
-                        className="gap-2"
-                      >
-                        {autoMode ? "ON" : "OFF"}
-                      </Button>
-                    </div>
-
-                    <div className="relative rounded-xl overflow-hidden bg-background/50">
-                      <Webcam
-                        ref={webcamRef}
-                        className="w-full rounded-xl"
-                        videoConstraints={{ facingMode: "user" }}
-                        onUserMedia={() => setIsProcessing(true)}
-                        screenshotFormat="image/jpeg"
-                      />
-                      <canvas
-                        ref={canvasRef}
-                        className="absolute inset-0 w-full h-full pointer-events-none"
-                      />
-                      
-                      {/* Scanning overlay */}
-                      {isProcessing && detectedFaces === 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="text-center">
-                            <Scan className="w-16 h-16 text-neon-cyan/50 animate-pulse mx-auto mb-2" />
-                            <p className="text-sm text-muted-foreground">Scanning for faces...</p>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Status Overlay */}
-                      <div className="absolute top-4 left-4 flex gap-2">
-                        <div className={`px-3 py-1.5 rounded-full backdrop-blur-sm border transition-all duration-300 ${
-                          detectedFaces > 0 
-                            ? "bg-neon-green/20 border-neon-green/50" 
-                            : "bg-background/80 border-neon-cyan/30"
-                        }`}>
-                          <span className={`text-sm font-mono ${
-                            detectedFaces > 0 ? "text-neon-green" : "text-neon-cyan"
-                          }`}>
-                            {detectedFaces > 0 ? `✓ ${detectedFaces} face${detectedFaces !== 1 ? "s" : ""}` : "No faces"}
-                          </span>
-                        </div>
-                        
-                        {currentMatch && (
-                          <div className="px-3 py-1.5 rounded-full backdrop-blur-sm bg-neon-purple/20 border border-neon-purple/50 animate-fade-in">
-                            <span className="text-sm font-mono text-neon-purple">
-                              {currentMatch.student.name} ({(currentMatch.confidence * 100).toFixed(0)}%)
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {lastDetection && (
-                        <div className="absolute bottom-4 left-4 animate-fade-in">
-                          <div className="px-4 py-2 rounded-lg bg-neon-green/20 border border-neon-green/50 backdrop-blur-sm">
-                            <span className="text-neon-green font-medium">
-                              ✓ Last: {lastDetection}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Instructions */}
-                    {students.length > 0 && studentsWithPhotos === 0 && (
-                      <div className="bg-neon-yellow/10 rounded-lg p-4 border border-neon-yellow/30">
-                        <h4 className="font-medium mb-2 flex items-center gap-2 text-neon-yellow">
-                          <Shield className="w-4 h-4" />
-                          Enable Auto-Recognition
-                        </h4>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          Add photos to student profiles to enable automatic face matching.
-                        </p>
-                        <Link to="/attendance/students">
-                          <Button variant="outline" size="sm" className="gap-2">
-                            <Camera className="w-4 h-4" />
-                            Add Student Photos
-                          </Button>
-                        </Link>
-                      </div>
-                    )}
-
-                    {/* Manual Student Selection */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold flex items-center gap-2">
-                          <Users className="w-5 h-5 text-neon-purple" />
-                          Students ({unmarkedStudents.length} remaining)
-                        </h3>
-                        <Link to="/attendance/students">
-                          <Button variant="outline" size="sm" className="gap-2 hover-lift">
-                            <UserPlus className="w-4 h-4" />
-                            Manage
-                          </Button>
-                        </Link>
-                      </div>
-
-                      {students.length === 0 ? (
-                        <div className="text-center py-8 border-2 border-dashed border-border rounded-xl">
-                          <Users className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
-                          <p className="text-muted-foreground mb-4">No students added yet</p>
-                          <Link to="/attendance/students">
-                            <Button variant="neon" size="sm" className="gap-2">
-                              <UserPlus className="w-4 h-4" />
-                              Add Students
-                            </Button>
-                          </Link>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                          {students.map((student, index) => {
-                            const isMarked = todayAttendance.some(r => r.studentId === student.id);
-                            const hasPhoto = !!student.imageData;
-                            
-                            return (
-                              <button
-                                key={student.id}
-                                onClick={() => !isMarked && markPresent(student)}
-                                disabled={isMarked}
-                                className={`p-3 rounded-xl text-left transition-all duration-300 border ${
-                                  isMarked
-                                    ? "bg-neon-green/10 border-neon-green/30 cursor-default"
-                                    : "bg-card/50 border-border hover:border-neon-purple/50 hover:bg-neon-purple/5 cursor-pointer hover-lift"
-                                }`}
-                                style={{ animationDelay: `${index * 0.05}s` }}
-                              >
-                                <div className="flex items-center gap-2 mb-1">
-                                  {student.imageData ? (
-                                    <img 
-                                      src={student.imageData} 
-                                      alt={student.name}
-                                      className="w-8 h-8 rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                                      <span className="text-sm font-bold">
-                                        {student.name.charAt(0)}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {isMarked && (
-                                    <CheckCircle2 className="w-4 h-4 text-neon-green ml-auto" />
-                                  )}
-                                </div>
-                                <p className={`font-medium text-sm truncate ${
-                                  isMarked ? "text-neon-green" : ""
-                                }`}>
-                                  {student.name}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{student.rollNo}</p>
-                                {!hasPhoto && !isMarked && (
-                                  <p className="text-xs text-neon-yellow/70 mt-1">No photo</p>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </Card>
-            </div>
-
-            {/* Sidebar */}
+          <div className="grid lg:grid-cols-2 gap-6">
+            {/* Camera Section */}
             <div className="space-y-4">
-              {/* Today's Stats */}
-              <Card className="glass-card p-5 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
-                <h3 className="font-semibold mb-4 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-neon-yellow" />
-                  Today's Progress
-                </h3>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Present</span>
-                    <span className="text-2xl font-bold text-neon-green">
-                      {todayAttendance.length}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Remaining</span>
-                    <span className="text-2xl font-bold text-neon-yellow">
-                      {unmarkedStudents.length}
-                    </span>
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  <div className="space-y-2">
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-neon-green to-neon-cyan transition-all duration-500"
-                        style={{
-                          width: students.length > 0
-                            ? `${(todayAttendance.length / students.length) * 100}%`
-                            : "0%",
-                        }}
-                      />
+              <Card className="glass-card overflow-hidden animate-fade-in-up">
+                <div className="relative aspect-video bg-background/50">
+                  <Webcam
+                    ref={webcamRef}
+                    className="w-full h-full object-cover"
+                    videoConstraints={{
+                      facingMode: "user",
+                      width: 640,
+                      height: 480,
+                    }}
+                    onUserMedia={() => setIsProcessing(true)}
+                  />
+                  <canvas
+                    ref={canvasRef}
+                    className="absolute inset-0 w-full h-full"
+                  />
+                  <canvas ref={matchCanvasRef} className="hidden" />
+
+                  {/* Overlay UI */}
+                  <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                      <div className={`w-2 h-2 rounded-full ${isProcessing ? "bg-neon-green animate-pulse" : "bg-muted"}`} />
+                      <span className="text-sm font-medium">
+                        {isProcessing ? "Scanning" : "Paused"}
+                      </span>
                     </div>
-                    <p className="text-xs text-muted-foreground text-center">
-                      {students.length > 0
-                        ? `${Math.round((todayAttendance.length / students.length) * 100)}% complete`
-                        : "No students"}
-                    </p>
+                    
+                    <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                      <Scan className="w-4 h-4 text-neon-cyan" />
+                      <span className="text-sm font-medium">
+                        {detectedFaces} face{detectedFaces !== 1 ? "s" : ""}
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Last Detection */}
+                  {lastDetection && (
+                    <div className="absolute bottom-4 left-4 right-4 flex items-center justify-center">
+                      <div className="bg-neon-green/20 backdrop-blur-sm border border-neon-green/50 px-4 py-2 rounded-full animate-fade-in">
+                        <span className="text-sm font-medium text-neon-green">
+                          ✓ {lastDetection} marked present
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Card>
 
-              {/* Attendance List */}
-              <Card className="glass-card p-5 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+              {/* Auto Mode Toggle */}
+              <Card className="glass-card p-4 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-neon-purple/10 flex items-center justify-center">
+                      <Zap className="w-5 h-5 text-neon-purple" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Auto Recognition</p>
+                      <p className="text-sm text-muted-foreground">
+                        Automatically mark attendance when faces are recognized
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant={autoMode ? "default" : "outline"}
+                    onClick={() => setAutoMode(!autoMode)}
+                    className={autoMode ? "bg-neon-green hover:bg-neon-green/80" : ""}
+                  >
+                    {autoMode ? "ON" : "OFF"}
+                  </Button>
+                </div>
+              </Card>
+            </div>
+
+            {/* Attendance Panel */}
+            <div className="space-y-4">
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-4">
+                <Card className="glass-card p-4 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-neon-green/10 flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-neon-green" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-neon-green">{presentCount}</p>
+                      <p className="text-sm text-muted-foreground">Present</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="glass-card p-4 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-neon-pink/10 flex items-center justify-center">
+                      <XCircle className="w-5 h-5 text-neon-pink" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-neon-pink">{totalStudents - presentCount}</p>
+                      <p className="text-sm text-muted-foreground">Absent</p>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Student List */}
+              <Card className="glass-card p-4 animate-fade-in-up" style={{ animationDelay: "0.4s" }}>
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-neon-cyan" />
-                  Marked Present
+                  <Users className="w-4 h-4" />
+                  Student List
                 </h3>
                 
-                {todayAttendance.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No attendance marked yet
-                  </p>
+                {students.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+                      <UserPlus className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground mb-4">No students added yet</p>
+                    <Link to="/attendance/students">
+                      <Button className="gap-2 bg-gradient-to-r from-neon-purple to-neon-pink">
+                        <UserPlus className="w-4 h-4" />
+                        Add Students
+                      </Button>
+                    </Link>
+                  </div>
                 ) : (
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {todayAttendance.map((record) => (
-                      <div
-                        key={record.studentId}
-                        className="flex items-center gap-3 p-2 rounded-lg bg-neon-green/5 border border-neon-green/20"
-                      >
-                        <CheckCircle2 className="w-4 h-4 text-neon-green flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{record.studentName}</p>
-                          <p className="text-xs text-muted-foreground">{record.timestamp}</p>
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
+                    {students.map((student) => {
+                      const isPresent = todayAttendance.some(
+                        (r) => r.studentId === student.id
+                      );
+                      return (
+                        <div
+                          key={student.id}
+                          className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                            isPresent
+                              ? "bg-neon-green/10 border-neon-green/30"
+                              : "bg-muted/20 border-border hover:border-neon-purple/50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {student.imageUrl ? (
+                              <img
+                                src={student.imageUrl}
+                                alt={student.name}
+                                className="w-10 h-10 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-neon-purple/20 flex items-center justify-center">
+                                <span className="font-bold text-neon-purple">
+                                  {student.name.charAt(0)}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-medium">{student.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Roll: {student.rollNo}
+                              </p>
+                            </div>
+                          </div>
+                          {isPresent ? (
+                            <div className="flex items-center gap-2 text-neon-green">
+                              <CheckCircle2 className="w-5 h-5" />
+                              <span className="text-sm font-medium">Present</span>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => markPresent(student)}
+                              className="gap-1 hover:border-neon-green/50 hover:bg-neon-green/10"
+                            >
+                              <UserCheck className="w-4 h-4" />
+                              Mark
+                            </Button>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </Card>
@@ -821,19 +740,14 @@ const Attendance = () => {
               <Button
                 onClick={submitToGoogleSheets}
                 disabled={isSubmitting || todayAttendance.length === 0}
-                className="w-full gap-2 h-12 bg-gradient-to-r from-neon-cyan to-neon-green text-background font-semibold hover:opacity-90"
+                className="w-full gap-2 bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90 h-12"
               >
                 {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Submitting...
-                  </>
+                  <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <>
-                    <Send className="w-5 h-5" />
-                    Submit to Google Sheets
-                  </>
+                  <Send className="w-5 h-5" />
                 )}
+                Submit to Google Sheets
               </Button>
             </div>
           </div>
