@@ -4,8 +4,11 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Upload, Download, Loader2, ImageIcon, Trash2, Paintbrush, Eraser, RotateCcw, History, Clock, Save, SlidersHorizontal } from "lucide-react";
+import { Upload, Download, Loader2, ImageIcon, Trash2, Paintbrush, Eraser, RotateCcw, History, Clock, Save, SlidersHorizontal, Palette, Image as ImageLucide } from "lucide-react";
 import { ImageComparisonSlider } from "@/components/ImageComparisonSlider";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { removeBackground, loadImage } from "@/lib/backgroundRemoval";
 import { cn } from "@/lib/utils";
@@ -14,6 +17,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 
 type BrushMode = "erase" | "restore";
+type BackgroundType = "transparent" | "solid" | "image";
+
+const PRESET_COLORS = [
+  "#FFFFFF", "#000000", "#FF0000", "#00FF00", "#0000FF", 
+  "#FFFF00", "#FF00FF", "#00FFFF", "#808080", "#FFA500",
+  "#800080", "#008080", "#FFC0CB", "#A52A2A", "#F5F5DC"
+];
 
 export default function BackgroundRemoval() {
   const navigate = useNavigate();
@@ -31,12 +41,17 @@ export default function BackgroundRemoval() {
   const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const [backgroundType, setBackgroundType] = useState<BackgroundType>("transparent");
+  const [backgroundColor, setBackgroundColor] = useState("#FFFFFF");
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [compositeImage, setCompositeImage] = useState<string | null>(null);
   
   const { history, isLoading: historyLoading, saveToHistory, deleteFromHistory } = useBackgroundRemovalHistory();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const bgImageInputRef = useRef<HTMLInputElement>(null);
   const originalImageRef = useRef<HTMLImageElement | null>(null);
   const processedImageRef = useRef<HTMLImageElement | null>(null);
 
@@ -97,6 +112,80 @@ export default function BackgroundRemoval() {
       img.src = processedImage;
     }
   }, [showEditor, processedImage, originalImage]);
+
+  // Generate composite image when background settings change
+  useEffect(() => {
+    if (!processedImage) {
+      setCompositeImage(null);
+      return;
+    }
+
+    if (backgroundType === "transparent") {
+      setCompositeImage(null);
+      return;
+    }
+
+    const generateComposite = async () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const fgImg = new Image();
+      fgImg.crossOrigin = "anonymous";
+      
+      fgImg.onload = async () => {
+        canvas.width = fgImg.width;
+        canvas.height = fgImg.height;
+
+        // Draw background
+        if (backgroundType === "solid") {
+          ctx.fillStyle = backgroundColor;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        } else if (backgroundType === "image" && backgroundImage) {
+          const bgImg = new Image();
+          bgImg.crossOrigin = "anonymous";
+          
+          await new Promise<void>((resolve) => {
+            bgImg.onload = () => {
+              // Scale background to cover the canvas
+              const scale = Math.max(canvas.width / bgImg.width, canvas.height / bgImg.height);
+              const x = (canvas.width - bgImg.width * scale) / 2;
+              const y = (canvas.height - bgImg.height * scale) / 2;
+              ctx.drawImage(bgImg, x, y, bgImg.width * scale, bgImg.height * scale);
+              resolve();
+            };
+            bgImg.onerror = () => resolve();
+            bgImg.src = backgroundImage;
+          });
+        }
+
+        // Draw foreground (processed image with transparency)
+        ctx.drawImage(fgImg, 0, 0);
+
+        // Create composite URL
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            setCompositeImage(url);
+          }
+        }, "image/png");
+      };
+      
+      fgImg.src = processedImage;
+    };
+
+    generateComposite();
+  }, [processedImage, backgroundType, backgroundColor, backgroundImage]);
+
+  const handleBackgroundImageSelect = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setBackgroundImage(url);
+    setBackgroundType("image");
+  }, []);
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -332,6 +421,13 @@ export default function BackgroundRemoval() {
         URL.revokeObjectURL(url);
         toast.success("Image downloaded!");
       }, "image/png");
+    } else if (compositeImage && backgroundType !== "transparent") {
+      // Download composite with background
+      const link = document.createElement("a");
+      link.href = compositeImage;
+      link.download = backgroundType === "solid" ? "background-replaced-color.png" : "background-replaced-image.png";
+      link.click();
+      toast.success("Image downloaded!");
     } else if (processedImage) {
       const link = document.createElement("a");
       link.href = processedImage;
@@ -339,7 +435,7 @@ export default function BackgroundRemoval() {
       link.click();
       toast.success("Image downloaded!");
     }
-  }, [showEditor, processedImage]);
+  }, [showEditor, processedImage, compositeImage, backgroundType]);
 
   const handleClear = useCallback(() => {
     setOriginalImage(null);
@@ -347,8 +443,14 @@ export default function BackgroundRemoval() {
     setOriginalBlob(null);
     setProcessedBlob(null);
     setShowEditor(false);
+    setBackgroundType("transparent");
+    setBackgroundImage(null);
+    setCompositeImage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+    if (bgImageInputRef.current) {
+      bgImageInputRef.current.value = "";
     }
   }, []);
 
@@ -616,18 +718,33 @@ export default function BackgroundRemoval() {
                     </CardContent>
                   </Card>
 
-                  {/* Processed */}
+                  {/* Processed with Background Options */}
                   <Card className="glass-card">
                     <CardHeader>
-                      <CardTitle className="text-lg">Background Removed</CardTitle>
+                      <CardTitle className="text-lg">
+                        {backgroundType === "transparent" ? "Background Removed" : "New Background"}
+                      </CardTitle>
                       <CardDescription>
-                        {isProcessing ? progressMessage : "Transparent PNG"}
+                        {isProcessing ? progressMessage : 
+                          backgroundType === "transparent" ? "Transparent PNG" :
+                          backgroundType === "solid" ? "Solid color background" : "Custom image background"}
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
+                      {/* Background preview */}
                       <div 
-                        className="aspect-square rounded-lg overflow-hidden flex items-center justify-center"
-                        style={{
+                        className="aspect-square rounded-lg overflow-hidden flex items-center justify-center relative"
+                        style={backgroundType === "transparent" ? {
+                          backgroundImage: "linear-gradient(45deg, hsl(var(--muted)) 25%, transparent 25%), linear-gradient(-45deg, hsl(var(--muted)) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, hsl(var(--muted)) 75%), linear-gradient(-45deg, transparent 75%, hsl(var(--muted)) 75%)",
+                          backgroundSize: "20px 20px",
+                          backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px"
+                        } : backgroundType === "solid" ? {
+                          backgroundColor: backgroundColor
+                        } : backgroundImage ? {
+                          backgroundImage: `url(${backgroundImage})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center"
+                        } : {
                           backgroundImage: "linear-gradient(45deg, hsl(var(--muted)) 25%, transparent 25%), linear-gradient(-45deg, hsl(var(--muted)) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, hsl(var(--muted)) 75%), linear-gradient(-45deg, transparent 75%, hsl(var(--muted)) 75%)",
                           backgroundSize: "20px 20px",
                           backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px"
@@ -638,6 +755,12 @@ export default function BackgroundRemoval() {
                             <Loader2 className="w-12 h-12 text-primary animate-spin" />
                             <p className="text-sm text-muted-foreground">{progressMessage}</p>
                           </div>
+                        ) : (compositeImage && backgroundType !== "transparent") ? (
+                          <img
+                            src={compositeImage}
+                            alt="Composite"
+                            className="max-w-full max-h-full object-contain"
+                          />
                         ) : processedImage ? (
                           <img
                             src={processedImage}
@@ -651,6 +774,113 @@ export default function BackgroundRemoval() {
                           </div>
                         )}
                       </div>
+
+                      {/* Background Options */}
+                      {processedImage && !isProcessing && (
+                        <div className="space-y-3 pt-2 border-t border-border">
+                          <Label className="text-sm font-medium flex items-center gap-2">
+                            <Palette className="w-4 h-4" />
+                            Background Options
+                          </Label>
+                          <Tabs value={backgroundType} onValueChange={(v) => setBackgroundType(v as BackgroundType)} className="w-full">
+                            <TabsList className="grid w-full grid-cols-3">
+                              <TabsTrigger value="transparent">Transparent</TabsTrigger>
+                              <TabsTrigger value="solid">Color</TabsTrigger>
+                              <TabsTrigger value="image">Image</TabsTrigger>
+                            </TabsList>
+                            
+                            <TabsContent value="solid" className="mt-3 space-y-3">
+                              <div className="flex flex-wrap gap-2">
+                                {PRESET_COLORS.map((color) => (
+                                  <button
+                                    key={color}
+                                    onClick={() => setBackgroundColor(color)}
+                                    className={cn(
+                                      "w-8 h-8 rounded-lg border-2 transition-all hover:scale-110",
+                                      backgroundColor === color ? "border-primary ring-2 ring-primary/30" : "border-border"
+                                    )}
+                                    style={{ backgroundColor: color }}
+                                    title={color}
+                                  />
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Label htmlFor="customColor" className="text-xs text-muted-foreground">Custom:</Label>
+                                <Input
+                                  id="customColor"
+                                  type="color"
+                                  value={backgroundColor}
+                                  onChange={(e) => setBackgroundColor(e.target.value)}
+                                  className="w-12 h-8 p-1 cursor-pointer"
+                                />
+                                <Input
+                                  type="text"
+                                  value={backgroundColor}
+                                  onChange={(e) => setBackgroundColor(e.target.value)}
+                                  className="w-24 h-8 text-xs font-mono"
+                                  placeholder="#FFFFFF"
+                                />
+                              </div>
+                            </TabsContent>
+                            
+                            <TabsContent value="image" className="mt-3 space-y-3">
+                              <div 
+                                className={cn(
+                                  "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors",
+                                  backgroundImage ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/30"
+                                )}
+                                onClick={() => bgImageInputRef.current?.click()}
+                              >
+                                {backgroundImage ? (
+                                  <div className="flex items-center gap-3">
+                                    <img 
+                                      src={backgroundImage} 
+                                      alt="Background" 
+                                      className="w-16 h-16 object-cover rounded"
+                                    />
+                                    <div className="text-left flex-1">
+                                      <p className="text-sm font-medium">Background image set</p>
+                                      <p className="text-xs text-muted-foreground">Click to change</p>
+                                    </div>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setBackgroundImage(null);
+                                        if (bgImageInputRef.current) bgImageInputRef.current.value = "";
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <ImageLucide className="w-8 h-8 text-muted-foreground" />
+                                    <p className="text-sm text-muted-foreground">Click to upload background image</p>
+                                  </div>
+                                )}
+                              </div>
+                              <input
+                                ref={bgImageInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleBackgroundImageSelect(file);
+                                }}
+                              />
+                            </TabsContent>
+
+                            <TabsContent value="transparent" className="mt-3">
+                              <p className="text-sm text-muted-foreground">
+                                Download as a transparent PNG for use in other designs.
+                              </p>
+                            </TabsContent>
+                          </Tabs>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
