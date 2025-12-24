@@ -57,27 +57,39 @@ export function Layout({
       <header className={cn("fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-out", scrolled ? "bg-background/90 backdrop-blur-xl border-b border-border/50 shadow-lg shadow-background/10" : "bg-transparent")}>
         <div className="container mx-auto px-4">
           <nav className="flex items-center justify-between h-16">
-            {/* Logo with hover animation */}
+            {/* Logo */}
             <Link to="/" className="flex items-center gap-3 opacity-0 animate-fade-in group">
-              <div className="relative w-10 h-10">
-                {/* Outer ring */}
-                <div className="absolute inset-0 rounded-full border-2 border-primary/30 group-hover:border-primary/60 transition-colors duration-300" />
-                {/* Middle animated ring */}
-                <div className="absolute inset-1 rounded-full border-2 border-primary group-hover:scale-110 transition-transform duration-300" />
-                {/* Inner eye/lens */}
-                <div className="absolute inset-2.5 rounded-full bg-gradient-to-br from-primary via-primary to-primary/80 shadow-lg shadow-primary/30">
-                  <div className="absolute inset-1 rounded-full bg-gradient-to-br from-primary-foreground/20 to-transparent" />
-                  <div className="absolute top-1 left-1.5 w-1.5 h-1.5 rounded-full bg-primary-foreground/60" />
-                </div>
-                {/* Scanning line effect */}
-                <div className="absolute inset-0 rounded-full overflow-hidden">
-                  <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary-foreground/40 to-transparent group-hover:animate-pulse" />
-                </div>
+              <div className="relative w-10 h-10 flex items-center justify-center">
+                {/* Hexagon background */}
+                <svg viewBox="0 0 40 40" className="w-full h-full">
+                  <defs>
+                    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="hsl(var(--primary))" />
+                      <stop offset="100%" stopColor="hsl(var(--primary) / 0.7)" />
+                    </linearGradient>
+                  </defs>
+                  {/* Hexagon */}
+                  <polygon 
+                    points="20,2 36,11 36,29 20,38 4,29 4,11" 
+                    fill="url(#logoGradient)"
+                    className="drop-shadow-lg"
+                  />
+                  {/* V shape */}
+                  <path 
+                    d="M12,12 L20,28 L28,12" 
+                    fill="none" 
+                    stroke="hsl(var(--primary-foreground))" 
+                    strokeWidth="3" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                    className="group-hover:stroke-[3.5] transition-all duration-300"
+                  />
+                </svg>
               </div>
-              <span className="font-bold text-xl hidden sm:inline tracking-tight">
-                <span className="text-primary">Vision</span>
-                <span className="text-foreground">Hub</span>
-              </span>
+              <div className="hidden sm:flex flex-col leading-none">
+                <span className="font-black text-lg tracking-tight text-foreground">VISION</span>
+                <span className="text-[10px] font-semibold tracking-[0.3em] text-primary">HUB</span>
+              </div>
             </Link>
 
             {/* Navigation links with stagger animation */}
