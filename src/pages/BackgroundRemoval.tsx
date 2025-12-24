@@ -64,7 +64,7 @@ export default function BackgroundRemoval() {
 
   // Initialize canvas when entering editor mode
   useEffect(() => {
-    if (showEditor && processedImage && originalImage && canvasRef.current && maskCanvasRef.current) {
+    if (showEditor && processedBlob && originalBlob && canvasRef.current && maskCanvasRef.current) {
       const canvas = canvasRef.current;
       const maskCanvas = maskCanvasRef.current;
       const ctx = canvas.getContext("2d");
@@ -72,46 +72,69 @@ export default function BackgroundRemoval() {
       
       if (!ctx || !maskCtx) return;
 
-      const img = new Image();
-      img.onload = () => {
-        // Set canvas size
-        const maxSize = 600;
-        let width = img.width;
-        let height = img.height;
-        
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = (height / width) * maxSize;
-            width = maxSize;
-          } else {
-            width = (width / height) * maxSize;
-            height = maxSize;
+      // Use createImageBitmap to avoid canvas tainting issues with blob URLs
+      const initCanvas = async () => {
+        try {
+          const processedBitmap = await createImageBitmap(processedBlob);
+          const originalBitmap = await createImageBitmap(originalBlob);
+          
+          // Set canvas size
+          const maxSize = 600;
+          let width = processedBitmap.width;
+          let height = processedBitmap.height;
+          
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = (height / width) * maxSize;
+              width = maxSize;
+            } else {
+              width = (width / height) * maxSize;
+              height = maxSize;
+            }
           }
+          
+          canvas.width = width;
+          canvas.height = height;
+          maskCanvas.width = width;
+          maskCanvas.height = height;
+          
+          // Draw processed image
+          ctx.drawImage(processedBitmap, 0, 0, width, height);
+          
+          // Store as Image elements for later use (create from canvas to avoid CORS)
+          const processedDataUrl = canvas.toDataURL("image/png");
+          const processedImg = new Image();
+          processedImg.onload = () => {
+            processedImageRef.current = processedImg;
+          };
+          processedImg.src = processedDataUrl;
+          
+          // Create original image from bitmap
+          const origCanvas = document.createElement("canvas");
+          origCanvas.width = width;
+          origCanvas.height = height;
+          const origCtx = origCanvas.getContext("2d");
+          if (origCtx) {
+            origCtx.drawImage(originalBitmap, 0, 0, width, height);
+            const origDataUrl = origCanvas.toDataURL("image/png");
+            const origImg = new Image();
+            origImg.onload = () => {
+              originalImageRef.current = origImg;
+            };
+            origImg.src = origDataUrl;
+          }
+          
+          // Initialize mask as fully opaque (white = keep)
+          maskCtx.fillStyle = "white";
+          maskCtx.fillRect(0, 0, width, height);
+        } catch (error) {
+          console.error("Error initializing canvas:", error);
         }
-        
-        canvas.width = width;
-        canvas.height = height;
-        maskCanvas.width = width;
-        maskCanvas.height = height;
-        
-        // Draw processed image
-        ctx.drawImage(img, 0, 0, width, height);
-        processedImageRef.current = img;
-        
-        // Initialize mask as fully opaque (white = keep)
-        maskCtx.fillStyle = "white";
-        maskCtx.fillRect(0, 0, width, height);
-        
-        // Load original image for restore mode
-        const origImg = new Image();
-        origImg.onload = () => {
-          originalImageRef.current = origImg;
-        };
-        origImg.src = originalImage;
       };
-      img.src = processedImage;
+      
+      initCanvas();
     }
-  }, [showEditor, processedImage, originalImage]);
+  }, [showEditor, processedBlob, originalBlob]);
 
   // Generate composite image when background settings change
   useEffect(() => {
@@ -346,22 +369,24 @@ export default function BackgroundRemoval() {
     if (coords) draw(coords.x, coords.y);
   };
 
-  const handleResetMask = () => {
+  const handleResetMask = useCallback(async () => {
     const maskCanvas = maskCanvasRef.current;
-    if (!maskCanvas) return;
+    if (!maskCanvas || !processedBlob) return;
     
     const maskCtx = maskCanvas.getContext("2d");
     if (!maskCtx) return;
     
-    // Reset to initial state based on processed image alpha
-    if (processedImageRef.current) {
+    try {
+      // Use createImageBitmap to avoid CORS issues
+      const bitmap = await createImageBitmap(processedBlob);
+      
       const tempCanvas = document.createElement("canvas");
       tempCanvas.width = maskCanvas.width;
       tempCanvas.height = maskCanvas.height;
       const tempCtx = tempCanvas.getContext("2d");
       if (!tempCtx) return;
       
-      tempCtx.drawImage(processedImageRef.current, 0, 0, maskCanvas.width, maskCanvas.height);
+      tempCtx.drawImage(bitmap, 0, 0, maskCanvas.width, maskCanvas.height);
       const imageData = tempCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
       
       // Create mask from alpha channel
@@ -378,10 +403,12 @@ export default function BackgroundRemoval() {
       
       maskCtx.putImageData(maskImageData, 0, 0);
       redrawCanvas();
+      toast.success("Mask reset!");
+    } catch (error) {
+      console.error("Error resetting mask:", error);
+      toast.error("Failed to reset mask");
     }
-    
-    toast.success("Mask reset!");
-  };
+  }, [processedBlob, redrawCanvas]);
 
   const handleDownload = useCallback(() => {
     if (showEditor && canvasRef.current && maskCanvasRef.current && originalImageRef.current) {
