@@ -4,7 +4,8 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Upload, Download, Loader2, ImageIcon, Trash2, Paintbrush, Eraser, RotateCcw, History, Clock, Save } from "lucide-react";
+import { Upload, Download, Loader2, ImageIcon, Trash2, Paintbrush, Eraser, RotateCcw, History, Clock, Save, SlidersHorizontal } from "lucide-react";
+import { ImageComparisonSlider } from "@/components/ImageComparisonSlider";
 import { toast } from "sonner";
 import { removeBackground, loadImage } from "@/lib/backgroundRemoval";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ export default function BackgroundRemoval() {
   const [originalBlob, setOriginalBlob] = useState<Blob | null>(null);
   const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
   
   const { history, isLoading: historyLoading, saveToHistory, deleteFromHistory } = useBackgroundRemovalHistory();
   
@@ -534,6 +536,14 @@ export default function BackgroundRemoval() {
                   Clear
                 </Button>
                 <Button
+                  variant={showCompare ? "default" : "outline"}
+                  onClick={() => setShowCompare(!showCompare)}
+                  disabled={!processedImage || isProcessing}
+                >
+                  <SlidersHorizontal className="w-4 h-4 mr-2" />
+                  {showCompare ? "Hide Compare" : "Compare"}
+                </Button>
+                <Button
                   variant="outline"
                   onClick={() => setShowEditor(true)}
                   disabled={!processedImage || isProcessing}
@@ -564,62 +574,87 @@ export default function BackgroundRemoval() {
                 )}
               </div>
 
-              {/* Image Comparison */}
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Original */}
+              {/* Comparison Slider */}
+              {showCompare && processedImage && (
                 <Card className="glass-card">
                   <CardHeader>
-                    <CardTitle className="text-lg">Original</CardTitle>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <SlidersHorizontal className="w-5 h-5" />
+                      Compare Original vs Processed
+                    </CardTitle>
+                    <CardDescription>
+                      Drag the slider to compare the original and processed images
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="aspect-square bg-muted rounded-lg overflow-hidden flex items-center justify-center">
-                      <img
-                        src={originalImage}
-                        alt="Original"
-                        className="max-w-full max-h-full object-contain"
+                    <div className="max-w-2xl mx-auto">
+                      <ImageComparisonSlider 
+                        originalImage={originalImage}
+                        processedImage={processedImage}
                       />
                     </div>
                   </CardContent>
                 </Card>
+              )}
 
-                {/* Processed */}
-                <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Background Removed</CardTitle>
-                    <CardDescription>
-                      {isProcessing ? progressMessage : "Transparent PNG"}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div 
-                      className="aspect-square rounded-lg overflow-hidden flex items-center justify-center"
-                      style={{
-                        backgroundImage: "linear-gradient(45deg, hsl(var(--muted)) 25%, transparent 25%), linear-gradient(-45deg, hsl(var(--muted)) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, hsl(var(--muted)) 75%), linear-gradient(-45deg, transparent 75%, hsl(var(--muted)) 75%)",
-                        backgroundSize: "20px 20px",
-                        backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px"
-                      }}
-                    >
-                      {isProcessing ? (
-                        <div className="flex flex-col items-center gap-3">
-                          <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                          <p className="text-sm text-muted-foreground">{progressMessage}</p>
-                        </div>
-                      ) : processedImage ? (
+              {/* Image Comparison - Side by Side */}
+              {!showCompare && (
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Original */}
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Original</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="aspect-square bg-muted rounded-lg overflow-hidden flex items-center justify-center">
                         <img
-                          src={processedImage}
-                          alt="Processed"
+                          src={originalImage}
+                          alt="Original"
                           className="max-w-full max-h-full object-contain"
                         />
-                      ) : (
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                          <ImageIcon className="w-12 h-12" />
-                          <p className="text-sm">Processing...</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Processed */}
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Background Removed</CardTitle>
+                      <CardDescription>
+                        {isProcessing ? progressMessage : "Transparent PNG"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div 
+                        className="aspect-square rounded-lg overflow-hidden flex items-center justify-center"
+                        style={{
+                          backgroundImage: "linear-gradient(45deg, hsl(var(--muted)) 25%, transparent 25%), linear-gradient(-45deg, hsl(var(--muted)) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, hsl(var(--muted)) 75%), linear-gradient(-45deg, transparent 75%, hsl(var(--muted)) 75%)",
+                          backgroundSize: "20px 20px",
+                          backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px"
+                        }}
+                      >
+                        {isProcessing ? (
+                          <div className="flex flex-col items-center gap-3">
+                            <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                            <p className="text-sm text-muted-foreground">{progressMessage}</p>
+                          </div>
+                        ) : processedImage ? (
+                          <img
+                            src={processedImage}
+                            alt="Processed"
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                            <ImageIcon className="w-12 h-12" />
+                            <p className="text-sm">Processing...</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </div>
           )}
 
