@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 export interface AttendanceRecord {
   id: string;
@@ -49,7 +50,7 @@ export const useAttendance = () => {
       .order("marked_at", { ascending: true });
 
     if (error) {
-      console.error("Error fetching attendance:", error);
+      logger.error("useAttendance", error);
     } else {
       setRecords((data as DbAttendanceRecord[]).map(mapDbToRecord));
     }
@@ -64,7 +65,7 @@ export const useAttendance = () => {
       .order("marked_at", { ascending: true });
 
     if (error) {
-      console.error("Error fetching attendance:", error);
+      logger.error("useAttendance", error);
       return [];
     }
     return (data as DbAttendanceRecord[]).map(mapDbToRecord);
@@ -78,7 +79,7 @@ export const useAttendance = () => {
       .order("marked_at", { ascending: true });
 
     if (error) {
-      console.error("Error fetching all attendance:", error);
+      logger.error("useAttendance", error);
       return [];
     }
     return (data as DbAttendanceRecord[]).map(mapDbToRecord);
@@ -116,7 +117,7 @@ export const useAttendance = () => {
       if (error.code === "23505") {
         return { success: false };
       }
-      console.error("Error marking attendance:", error);
+      logger.error("useAttendance", error);
       toast({
         title: "Error",
         description: "Failed to save attendance",

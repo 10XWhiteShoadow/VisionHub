@@ -78,6 +78,13 @@ const Attendance = () => {
   const faceHistoryRef = useRef<number[]>([]);
   const matchHistoryRef = useRef<{ studentId: string; confidence: number }[]>([]);
 
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
+
   // Initialize MediaPipe Face Detector
   useEffect(() => {
     const initializeFaceDetector = async () => {
