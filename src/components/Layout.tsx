@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Home, Scan, Hand, Package, Activity, FileText, Github, UserCheck, Eye } from "lucide-react";
+import { Home, Scan, Hand, Package, Activity, FileText, Github, UserCheck, Eye, Eraser } from "lucide-react";
 import { cn } from "@/lib/utils";
 interface LayoutProps {
   children: ReactNode;
@@ -30,6 +30,10 @@ const navItems = [{
   path: "/ocr",
   icon: FileText,
   label: "OCR"
+}, {
+  path: "/background-removal",
+  icon: Eraser,
+  label: "BG Remove"
 }, {
   path: "/attendance",
   icon: UserCheck,
