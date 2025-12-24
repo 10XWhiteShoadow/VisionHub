@@ -2,9 +2,11 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { StatsDisplay } from "@/components/StatsDisplay";
 import { Button } from "@/components/ui/button";
-import { FileText, Camera, Copy, RefreshCw, Languages, Settings, Loader2 } from "lucide-react";
+import { FileText, Camera, Copy, RefreshCw, Languages, Settings, Loader2, Sparkles } from "lucide-react";
 import Tesseract from "tesseract.js";
 import Webcam from "react-webcam";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const languages = [
   { code: "es", name: "Spanish", flag: "🇪🇸" },
@@ -31,7 +33,9 @@ const ocrLanguages = [
  */
 export default function OCR() {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [extractedText, setExtractedText] = useState("");
+  const [correctedText, setCorrectedText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [selectedLang, setSelectedLang] = useState("es");
   const [ocrLang, setOcrLang] = useState("eng");
@@ -192,71 +196,66 @@ export default function OCR() {
       setExtractedText(text);
       setConfidence(Math.round(result.data.confidence));
       
-      // Translate if text found
+      // Process with AI for correction and translation
       if (text) {
-        translateText(text, selectedLang);
+        await processWithAI(text, selectedLang);
       }
     } catch (err) {
       console.error("OCR error:", err);
       setExtractedText("Error processing image. Try again with clearer text.");
+      toast.error("Failed to process image");
     } finally {
       setIsProcessing(false);
       setProgress(0);
     }
   };
 
-  // Simple translation using dictionary + pattern matching
-  const translateText = async (text: string, targetLang: string) => {
-    // Basic translation dictionary
-    const translations: Record<string, Record<string, string>> = {
-      // Common words
-      "hello": { es: "hola", fr: "bonjour", de: "hallo", ja: "こんにちは", zh: "你好", hi: "नमस्ते" },
-      "world": { es: "mundo", fr: "monde", de: "welt", ja: "世界", zh: "世界", hi: "दुनिया" },
-      "the": { es: "el", fr: "le", de: "der", ja: "", zh: "", hi: "" },
-      "is": { es: "es", fr: "est", de: "ist", ja: "です", zh: "是", hi: "है" },
-      "a": { es: "un", fr: "un", de: "ein", ja: "", zh: "", hi: "एक" },
-      "and": { es: "y", fr: "et", de: "und", ja: "と", zh: "和", hi: "और" },
-      "to": { es: "a", fr: "à", de: "zu", ja: "へ", zh: "到", hi: "को" },
-      "of": { es: "de", fr: "de", de: "von", ja: "の", zh: "的", hi: "का" },
-      "in": { es: "en", fr: "dans", de: "in", ja: "で", zh: "在", hi: "में" },
-      "for": { es: "para", fr: "pour", de: "für", ja: "のために", zh: "为", hi: "के लिए" },
-      "you": { es: "tú", fr: "tu", de: "du", ja: "あなた", zh: "你", hi: "आप" },
-      "i": { es: "yo", fr: "je", de: "ich", ja: "私", zh: "我", hi: "मैं" },
-      "this": { es: "esto", fr: "ceci", de: "dies", ja: "これ", zh: "这", hi: "यह" },
-      "that": { es: "eso", fr: "cela", de: "das", ja: "それ", zh: "那", hi: "वह" },
-      "good": { es: "bueno", fr: "bon", de: "gut", ja: "良い", zh: "好", hi: "अच्छा" },
-      "thank": { es: "gracias", fr: "merci", de: "danke", ja: "ありがとう", zh: "谢谢", hi: "धन्यवाद" },
-      "please": { es: "por favor", fr: "s'il vous plaît", de: "bitte", ja: "お願いします", zh: "请", hi: "कृपया" },
-      "yes": { es: "sí", fr: "oui", de: "ja", ja: "はい", zh: "是", hi: "हाँ" },
-      "no": { es: "no", fr: "non", de: "nein", ja: "いいえ", zh: "不", hi: "नहीं" },
-      "welcome": { es: "bienvenido", fr: "bienvenue", de: "willkommen", ja: "ようこそ", zh: "欢迎", hi: "स्वागत" },
-      "text": { es: "texto", fr: "texte", de: "text", ja: "テキスト", zh: "文本", hi: "पाठ" },
-      "image": { es: "imagen", fr: "image", de: "bild", ja: "画像", zh: "图片", hi: "छवि" },
-      "camera": { es: "cámara", fr: "caméra", de: "kamera", ja: "カメラ", zh: "相机", hi: "कैमरा" },
-      "scan": { es: "escanear", fr: "scanner", de: "scannen", ja: "スキャン", zh: "扫描", hi: "स्कैन" },
-      "read": { es: "leer", fr: "lire", de: "lesen", ja: "読む", zh: "读", hi: "पढ़ना" },
-      "write": { es: "escribir", fr: "écrire", de: "schreiben", ja: "書く", zh: "写", hi: "लिखना" },
-    };
-
-    const words = text.toLowerCase().split(/\s+/);
-    const translated = words.map((word) => {
-      const clean = word.replace(/[^a-z]/gi, "");
-      const translation = translations[clean]?.[targetLang];
-      if (translation) {
-        // Preserve original punctuation
-        const prefix = word.match(/^[^a-z]*/i)?.[0] || "";
-        const suffix = word.match(/[^a-z]*$/i)?.[0] || "";
-        return prefix + translation + suffix;
-      }
-      return word;
-    }).join(" ");
+  // Process text with AI for correction and translation
+  const processWithAI = async (text: string, targetLang: string) => {
+    setIsAiProcessing(true);
     
-    setTranslatedText(translated);
+    const langName = languages.find(l => l.code === targetLang)?.name || targetLang;
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ocr-process', {
+        body: { 
+          text, 
+          targetLanguage: langName,
+          action: 'both'
+        }
+      });
+
+      if (error) {
+        console.error("AI processing error:", error);
+        toast.error("AI processing failed. Using original text.");
+        setCorrectedText(text);
+        setTranslatedText("");
+        return;
+      }
+
+      if (data.error) {
+        toast.error(data.error);
+        setCorrectedText(text);
+        setTranslatedText("");
+        return;
+      }
+
+      setCorrectedText(data.correctedText || text);
+      setTranslatedText(data.translatedText || "");
+      toast.success("Text corrected and translated!");
+    } catch (err) {
+      console.error("AI processing error:", err);
+      toast.error("AI processing failed");
+      setCorrectedText(text);
+    } finally {
+      setIsAiProcessing(false);
+    }
   };
 
   // Copy text to clipboard
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard!");
   };
 
   // Retake photo
@@ -264,15 +263,16 @@ export default function OCR() {
     setCapturedImage(null);
     setProcessedImage(null);
     setExtractedText("");
+    setCorrectedText("");
     setTranslatedText("");
     setConfidence(0);
   };
 
-  // Change translation language
-  const changeLanguage = (lang: string) => {
+  // Change translation language and re-translate
+  const changeLanguage = async (lang: string) => {
     setSelectedLang(lang);
-    if (extractedText) {
-      translateText(extractedText, lang);
+    if (correctedText || extractedText) {
+      await processWithAI(correctedText || extractedText, lang);
     }
   };
 
@@ -406,18 +406,40 @@ export default function OCR() {
 
           {/* Results panel */}
           <div className="space-y-6">
-            {/* Extracted text */}
+            {/* Extracted text (raw OCR) */}
             <div className="glass-card rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <FileText className="w-5 h-5 text-neon-cyan" />
-                  Extracted Text
+                  Raw OCR Text
                 </h3>
-                {extractedText && (
+              </div>
+              <div className="min-h-[80px] p-4 bg-card rounded-xl border border-border">
+                {extractedText ? (
+                  <p className="font-mono text-sm whitespace-pre-wrap text-muted-foreground">{extractedText}</p>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    {isProcessing
+                      ? "Extracting text from image..."
+                      : "Capture an image with text to extract it"}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* AI Corrected text */}
+            <div className="glass-card rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-neon-green" />
+                  AI Corrected Text
+                  {isAiProcessing && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
+                </h3>
+                {correctedText && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => copyToClipboard(extractedText)}
+                    onClick={() => copyToClipboard(correctedText)}
                     className="gap-2"
                   >
                     <Copy className="w-4 h-4" />
@@ -425,14 +447,14 @@ export default function OCR() {
                   </Button>
                 )}
               </div>
-              <div className="min-h-[120px] p-4 bg-card rounded-xl border border-border">
-                {extractedText ? (
-                  <p className="font-mono text-sm whitespace-pre-wrap">{extractedText}</p>
+              <div className="min-h-[100px] p-4 bg-card rounded-xl border border-border">
+                {correctedText ? (
+                  <p className="font-mono text-sm whitespace-pre-wrap">{correctedText}</p>
                 ) : (
                   <p className="text-muted-foreground text-sm">
-                    {isProcessing
-                      ? "Extracting text from image..."
-                      : "Capture an image with text to extract it"}
+                    {isAiProcessing
+                      ? "AI is correcting spelling and errors..."
+                      : "Corrected text will appear here"}
                   </p>
                 )}
               </div>
@@ -444,6 +466,7 @@ export default function OCR() {
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <Languages className="w-5 h-5 text-neon-purple" />
                   Translation
+                  {isAiProcessing && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
                 </h3>
                 {translatedText && (
                   <Button
@@ -467,6 +490,7 @@ export default function OCR() {
                     size="sm"
                     onClick={() => changeLanguage(lang.code)}
                     className="gap-2"
+                    disabled={isAiProcessing}
                   >
                     <span>{lang.flag}</span>
                     <span className="hidden sm:inline">{lang.name}</span>
@@ -479,7 +503,9 @@ export default function OCR() {
                   <p className="font-mono text-sm whitespace-pre-wrap">{translatedText}</p>
                 ) : (
                   <p className="text-muted-foreground text-sm">
-                    Translation will appear here after text extraction
+                    {isAiProcessing 
+                      ? "AI is translating..." 
+                      : "Translation will appear here after text extraction"}
                   </p>
                 )}
               </div>
