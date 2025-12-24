@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 export interface BackgroundRemovalRecord {
   id: string;
@@ -20,7 +21,7 @@ export function useBackgroundRemovalHistory() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching history:", error);
+      logger.error("useBackgroundRemovalHistory", error);
     } else {
       setHistory(data || []);
     }
@@ -38,7 +39,7 @@ export function useBackgroundRemovalHistory() {
       .upload(originalPath, originalBlob, { contentType: "image/png" });
 
     if (origError) {
-      console.error("Error uploading original:", origError);
+      logger.error("useBackgroundRemovalHistory", origError);
       return null;
     }
 
@@ -48,7 +49,7 @@ export function useBackgroundRemovalHistory() {
       .upload(processedPath, processedBlob, { contentType: "image/png" });
 
     if (procError) {
-      console.error("Error uploading processed:", procError);
+      logger.error("useBackgroundRemovalHistory", procError);
       return null;
     }
 
@@ -72,7 +73,7 @@ export function useBackgroundRemovalHistory() {
       .single();
 
     if (error) {
-      console.error("Error saving to history:", error);
+      logger.error("useBackgroundRemovalHistory", error);
       return null;
     }
 
@@ -106,7 +107,7 @@ export function useBackgroundRemovalHistory() {
       .eq("id", id);
 
     if (error) {
-      console.error("Error deleting from history:", error);
+      logger.error("useBackgroundRemovalHistory", error);
       return false;
     }
 

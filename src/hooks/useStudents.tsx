@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 export interface Student {
   id: string;
@@ -31,6 +32,27 @@ export const useStudents = () => {
     createdAt: db.created_at,
   });
 
+  // Refresh signed URLs for students with photos
+  const refreshSignedUrls = async (studentList: Student[]): Promise<Student[]> => {
+    const updatedStudents = await Promise.all(
+      studentList.map(async (student) => {
+        if (student.imageUrl) {
+          // Extract the file path from the URL or use the student ID
+          const filePath = `${student.id}.jpg`;
+          const { data, error } = await supabase.storage
+            .from("student-photos")
+            .createSignedUrl(filePath, 3600);
+          
+          if (data?.signedUrl) {
+            return { ...student, imageUrl: data.signedUrl };
+          }
+        }
+        return student;
+      })
+    );
+    return updatedStudents;
+  };
+
   const fetchStudents = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -44,9 +66,12 @@ export const useStudents = () => {
         description: "Failed to load students",
         variant: "destructive",
       });
-      console.error("Error fetching students:", error);
+      logger.error("useStudents", error);
     } else {
-      setStudents((data as DbStudent[]).map(mapDbToStudent));
+      const mappedStudents = (data as DbStudent[]).map(mapDbToStudent);
+      // Refresh signed URLs for all students with photos
+      const studentsWithUrls = await refreshSignedUrls(mappedStudents);
+      setStudents(studentsWithUrls);
     }
     setLoading(false);
   }, [toast]);
@@ -65,15 +90,33 @@ export const useStudents = () => {
       .upload(filePath, file, { upsert: true });
 
     if (uploadError) {
-      console.error("Upload error:", uploadError);
+      logger.error("useStudents", uploadError);
       return null;
     }
 
-    const { data } = supabase.storage
+    // Use signed URL since bucket is private
+    const { data, error } = await supabase.storage
       .from("student-photos")
-      .getPublicUrl(filePath);
+      .createSignedUrl(filePath, 3600); // 1 hour expiry
 
-    return data.publicUrl + `?t=${Date.now()}`;
+    if (error || !data?.signedUrl) {
+      logger.error("useStudents", error);
+      return null;
+    }
+
+    return data.signedUrl;
+  };
+
+  // Get signed URL for a student photo
+  const getSignedPhotoUrl = async (filePath: string): Promise<string | null> => {
+    const { data, error } = await supabase.storage
+      .from("student-photos")
+      .createSignedUrl(filePath, 3600);
+    
+    if (error || !data?.signedUrl) {
+      return null;
+    }
+    return data.signedUrl;
   };
 
   const addStudent = async (
@@ -102,7 +145,7 @@ export const useStudents = () => {
     });
 
     if (error) {
-      console.error("Insert error:", error);
+      logger.error("useStudents", error);
       return { success: false, error: "Failed to add student" };
     }
 
@@ -141,7 +184,7 @@ export const useStudents = () => {
       .eq("id", id);
 
     if (error) {
-      console.error("Update error:", error);
+      logger.error("useStudents", error);
       return { success: false, error: "Failed to update student" };
     }
 
@@ -156,7 +199,7 @@ export const useStudents = () => {
     const { error } = await supabase.from("students").delete().eq("id", id);
 
     if (error) {
-      console.error("Delete error:", error);
+      logger.error("useStudents", error);
       return { success: false };
     }
 
