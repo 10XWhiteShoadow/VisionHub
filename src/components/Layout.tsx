@@ -1,8 +1,9 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Home, Scan, Hand, Package, Activity, FileText, Github, UserCheck } from "lucide-react";
+import { Home, Scan, Hand, Package, Activity, FileText, Github, UserCheck, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "./ThemeToggle";
 interface LayoutProps {
   children: ReactNode;
 }
@@ -59,36 +60,29 @@ export function Layout({
           <nav className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3 opacity-0 animate-fade-in group">
-              <div className="relative w-10 h-10 flex items-center justify-center">
-                {/* Hexagon background */}
-                <svg viewBox="0 0 40 40" className="w-full h-full">
-                  <defs>
-                    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="hsl(var(--primary))" />
-                      <stop offset="100%" stopColor="hsl(var(--primary) / 0.7)" />
-                    </linearGradient>
-                  </defs>
-                  {/* Hexagon */}
-                  <polygon 
-                    points="20,2 36,11 36,29 20,38 4,29 4,11" 
-                    fill="url(#logoGradient)"
-                    className="drop-shadow-lg"
-                  />
-                  {/* V shape */}
-                  <path 
-                    d="M12,12 L20,28 L28,12" 
-                    fill="none" 
-                    stroke="hsl(var(--primary-foreground))" 
-                    strokeWidth="3" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                    className="group-hover:stroke-[3.5] transition-all duration-300"
-                  />
-                </svg>
+              <div className="relative w-11 h-11">
+                {/* Outer glow ring */}
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary via-secondary to-primary opacity-20 blur-md group-hover:opacity-40 transition-opacity duration-300" />
+                
+                {/* Main container */}
+                <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-primary to-secondary p-[2px] group-hover:scale-105 transition-transform duration-300">
+                  <div className="w-full h-full rounded-2xl bg-background flex items-center justify-center overflow-hidden">
+                    {/* Inner gradient bg */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10" />
+                    
+                    {/* Eye icon with scanning effect */}
+                    <div className="relative z-10">
+                      <Eye className="w-6 h-6 text-primary group-hover:text-secondary transition-colors duration-300" strokeWidth={2.5} />
+                      {/* Scanning dot */}
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary group-hover:bg-secondary animate-pulse" />
+                    </div>
+                  </div>
+                </div>
               </div>
+              
               <div className="hidden sm:flex flex-col leading-none">
-                <span className="font-black text-lg tracking-tight text-foreground">VISION</span>
-                <span className="text-[10px] font-semibold tracking-[0.3em] text-primary">HUB</span>
+                <span className="font-black text-xl tracking-tight gradient-text-cyber">VISION</span>
+                <span className="text-xs font-bold tracking-[0.2em] text-muted-foreground">HUB</span>
               </div>
             </Link>
 
@@ -108,14 +102,15 @@ export function Layout({
             })}
             </div>
 
-            {/* GitHub link with hover effect */}
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hidden sm:flex opacity-0 animate-fade-in" style={{
-            animationDelay: "0.3s"
-          }}>
-              <Button variant="ghost" size="icon" className="transition-all duration-300 hover:scale-110 hover:rotate-12 hover:bg-primary/10">
-                <Github className="w-5 h-5" />
-              </Button>
-            </a>
+            {/* Right side actions */}
+            <div className="flex items-center gap-2 opacity-0 animate-fade-in" style={{ animationDelay: "0.3s" }}>
+              <ThemeToggle />
+              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hidden sm:flex">
+                <Button variant="ghost" size="icon" className="transition-all duration-300 hover:scale-110 hover:rotate-12 hover:bg-primary/10">
+                  <Github className="w-5 h-5" />
+                </Button>
+              </a>
+            </div>
           </nav>
         </div>
       </header>
