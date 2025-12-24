@@ -53,21 +53,26 @@ export function useBackgroundRemovalHistory() {
       return null;
     }
 
-    // Get public URLs
-    const { data: origUrl } = supabase.storage
+    // Get signed URLs since bucket is private
+    const { data: origUrlData, error: origUrlError } = await supabase.storage
       .from("background-removal")
-      .getPublicUrl(originalPath);
+      .createSignedUrl(originalPath, 3600);
 
-    const { data: procUrl } = supabase.storage
+    const { data: procUrlData, error: procUrlError } = await supabase.storage
       .from("background-removal")
-      .getPublicUrl(processedPath);
+      .createSignedUrl(processedPath, 3600);
+
+    if (origUrlError || procUrlError || !origUrlData?.signedUrl || !procUrlData?.signedUrl) {
+      logger.error("useBackgroundRemovalHistory", origUrlError || procUrlError);
+      return null;
+    }
 
     // Save to database
     const { data, error } = await supabase
       .from("background_removal_history")
       .insert({
-        original_image_url: origUrl.publicUrl,
-        processed_image_url: procUrl.publicUrl,
+        original_image_url: origUrlData.signedUrl,
+        processed_image_url: procUrlData.signedUrl,
       })
       .select()
       .single();

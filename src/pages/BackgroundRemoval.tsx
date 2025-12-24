@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,11 +9,14 @@ import { toast } from "sonner";
 import { removeBackground, loadImage } from "@/lib/backgroundRemoval";
 import { cn } from "@/lib/utils";
 import { useBackgroundRemovalHistory, BackgroundRemovalRecord } from "@/hooks/useBackgroundRemovalHistory";
+import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 
 type BrushMode = "erase" | "restore";
 
 export default function BackgroundRemoval() {
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [processedImage, setProcessedImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -33,6 +37,13 @@ export default function BackgroundRemoval() {
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const originalImageRef = useRef<HTMLImageElement | null>(null);
   const processedImageRef = useRef<HTMLImageElement | null>(null);
+
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
 
   // Initialize canvas when entering editor mode
   useEffect(() => {
