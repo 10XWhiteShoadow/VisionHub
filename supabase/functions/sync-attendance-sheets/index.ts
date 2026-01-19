@@ -40,10 +40,53 @@ serve(async (req) => {
       );
     }
 
+    // Validate that the key looks like JSON
+    const trimmedKey = GOOGLE_SERVICE_ACCOUNT_KEY.trim();
+    if (!trimmedKey.startsWith('{')) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid service account key format",
+          message: "The key should be JSON starting with '{'. You entered something that starts with: " + trimmedKey.substring(0, 10) + "...",
+          hint: "Download the JSON key file from Google Cloud Console (IAM → Service Accounts → Keys → Add Key → Create new key → JSON) and paste the ENTIRE file contents."
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
     const { action, records } = await req.json();
 
     // Parse the service account key
-    const serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT_KEY);
+    let serviceAccount;
+    try {
+      serviceAccount = JSON.parse(trimmedKey);
+    } catch (parseError) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Failed to parse service account key as JSON",
+          message: "The key appears to be malformed JSON. Make sure to copy the entire contents of the downloaded JSON file.",
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
+    if (!serviceAccount.client_email || !serviceAccount.private_key) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid service account key",
+          message: "The JSON is missing required fields (client_email or private_key). Make sure you're using a Service Account key, not an API key."
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
 
     // Generate JWT for Google OAuth
     const jwt = await generateGoogleJWT(serviceAccount);
