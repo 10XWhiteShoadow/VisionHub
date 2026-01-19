@@ -10,7 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import visionHubLogo from "@/assets/visionhub-logo.png";
 
 interface LayoutProps {
   children: ReactNode;
@@ -54,31 +53,11 @@ export function Layout({
         <div className="container mx-auto px-4">
           <nav className="flex items-center justify-between h-16">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-3 opacity-0 animate-fade-in group">
-              <div className="relative w-11 h-11">
-                {/* Outer glow ring */}
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary via-secondary to-primary opacity-20 blur-md group-hover:opacity-40 transition-opacity duration-300" />
-                
-                {/* Main container */}
-                <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-primary to-secondary p-[2px] group-hover:scale-105 transition-transform duration-300">
-                  <div className="w-full h-full rounded-2xl bg-background flex items-center justify-center overflow-hidden">
-                    {/* Inner gradient bg */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10" />
-                    
-                    {/* Logo image */}
-                    <img 
-                      src={visionHubLogo} 
-                      alt="VisionHub Logo" 
-                      className="relative z-10 w-7 h-7 object-contain group-hover:scale-110 transition-transform duration-300"
-                    />
-                  </div>
-                </div>
+            <Link to="/" className="flex items-center gap-2 opacity-0 animate-fade-in group">
+              <div className="w-8 h-8 rounded-lg bg-gradient-cyber flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
+                <Scan className="w-5 h-5 text-primary-foreground" />
               </div>
-              
-              <div className="hidden sm:flex flex-col leading-none">
-                <span className="font-black text-xl tracking-tight gradient-text-cyber">VISION</span>
-                <span className="text-xs font-bold tracking-[0.2em] text-muted-foreground">HUB</span>
-              </div>
+              <span className="font-bold text-gradient-animate">VisionHub</span>
             </Link>
 
             {/* Navigation links with stagger animation */}
