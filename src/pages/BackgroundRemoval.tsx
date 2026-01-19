@@ -742,18 +742,34 @@ export default function BackgroundRemoval() {
               Remove backgrounds from your images using AI-powered segmentation. 
               Use the brush tool for precise manual refinement.
             </p>
-            <Button
-              variant="outline"
-              onClick={() => setShowHistory(!showHistory)}
-              className="mt-2"
-            >
-              <History className="w-4 h-4 mr-2" />
-              {showHistory ? "Hide History" : "View History"}
-            </Button>
           </div>
 
-          {/* History Section */}
-          {showHistory && (
+          {/* Tabs for Demo and Learn */}
+          <Tabs defaultValue="demo" className="space-y-6">
+            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+              <TabsTrigger value="demo" className="gap-2">
+                <Video className="w-4 h-4" />
+                Live Demo
+              </TabsTrigger>
+              <TabsTrigger value="learn" className="gap-2">
+                <GraduationCap className="w-4 h-4" />
+                Learn How It Works
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="demo" className="space-y-6">
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowHistory(!showHistory)}
+                >
+                  <History className="w-4 h-4 mr-2" />
+                  {showHistory ? "Hide History" : "View History"}
+                </Button>
+              </div>
+
+              {/* History Section */}
+              {showHistory && (
             <Card className="glass-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1274,6 +1290,14 @@ export default function BackgroundRemoval() {
               </CardContent>
             </Card>
           )}
+            </TabsContent>
+
+            <TabsContent value="learn">
+              <div className="glass-card rounded-2xl p-6">
+                <ModelLearnContent type="background" />
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </Layout>

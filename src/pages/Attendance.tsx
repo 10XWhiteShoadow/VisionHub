@@ -4,6 +4,8 @@ import { Layout } from "@/components/Layout";
 import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModelLearnContent } from "@/components/ModelLearnContent";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import Webcam from "react-webcam";
@@ -32,6 +34,8 @@ import {
   VolumeX,
   UserMinus,
   Cloud,
+  GraduationCap,
+  Video,
 } from "lucide-react";
 
 interface FaceMatch {
@@ -562,7 +566,21 @@ const Attendance = () => {
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-6">
+          {/* Tabs for Demo and Learn */}
+          <Tabs defaultValue="demo" className="space-y-6">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="demo" className="gap-2">
+                <Video className="w-4 h-4" />
+                Live Demo
+              </TabsTrigger>
+              <TabsTrigger value="learn" className="gap-2">
+                <GraduationCap className="w-4 h-4" />
+                Learn How It Works
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="demo" className="space-y-6">
+              <div className="grid lg:grid-cols-2 gap-6">
             {/* Camera Section */}
             <div className="space-y-4">
               <Card className="glass-card overflow-hidden animate-fade-in-up">
@@ -827,7 +845,15 @@ const Attendance = () => {
                 </Button>
               </div>
             </div>
-          </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="learn">
+              <div className="glass-card rounded-2xl p-6">
+                <ModelLearnContent type="attendance" />
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </Layout>
