@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Home, Scan, Hand, Package, Activity, FileText, Github, UserCheck, Eye, Eraser, MoreHorizontal, Sparkles } from "lucide-react";
+import { Home, Scan, Hand, Package, Activity, FileText, Github, UserCheck, Eraser, MoreHorizontal, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import visionHubLogo from "@/assets/visionhub-logo.png";
 
 interface LayoutProps {
   children: ReactNode;
@@ -64,12 +65,12 @@ export function Layout({
                     {/* Inner gradient bg */}
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10" />
                     
-                    {/* Eye icon with scanning effect */}
-                    <div className="relative z-10">
-                      <Eye className="w-6 h-6 text-primary group-hover:text-secondary transition-colors duration-300" strokeWidth={2.5} />
-                      {/* Scanning dot */}
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary group-hover:bg-secondary animate-pulse" />
-                    </div>
+                    {/* Logo image */}
+                    <img 
+                      src={visionHubLogo} 
+                      alt="VisionHub Logo" 
+                      className="relative z-10 w-7 h-7 object-contain group-hover:scale-110 transition-transform duration-300"
+                    />
                   </div>
                 </div>
               </div>
