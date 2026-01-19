@@ -13,6 +13,7 @@ import OCR from "./pages/OCR";
 import Attendance from "./pages/Attendance";
 import StudentManagement from "./pages/StudentManagement";
 import BackgroundRemoval from "./pages/BackgroundRemoval";
+import Documentation from "./pages/Documentation";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/background-removal" element={<BackgroundRemoval />} />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/attendance/students" element={<StudentManagement />} />
+            <Route path="/docs" element={<Documentation />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

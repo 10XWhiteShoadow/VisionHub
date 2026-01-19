@@ -29,6 +29,7 @@ const moreNavItems = [
   { path: "/ocr", icon: FileText, label: "OCR" },
   { path: "/background-removal", icon: Eraser, label: "Background Removal" },
   { path: "/attendance", icon: UserCheck, label: "Attendance" },
+  { path: "/docs", icon: FileText, label: "Documentation" },
 ];
 
 /**
