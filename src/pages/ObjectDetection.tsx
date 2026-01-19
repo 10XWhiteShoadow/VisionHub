@@ -3,7 +3,9 @@ import { Layout } from "@/components/Layout";
 import { StatsDisplay } from "@/components/StatsDisplay";
 import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
-import { Package, Play, Pause, RefreshCw, Target, CheckCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModelLearnContent } from "@/components/ModelLearnContent";
+import { Package, Play, Pause, RefreshCw, Target, CheckCircle, GraduationCap, Video } from "lucide-react";
 import * as tf from "@tensorflow/tfjs";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import Webcam from "react-webcam";
@@ -274,101 +276,123 @@ export default function ObjectDetection() {
           </div>
         </div>
 
-        <StatsDisplay stats={stats} className="mb-6" />
+        {/* Tabs for Demo and Learn */}
+        <Tabs defaultValue="demo" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="demo" className="gap-2">
+              <Video className="w-4 h-4" />
+              Live Demo
+            </TabsTrigger>
+            <TabsTrigger value="learn" className="gap-2">
+              <GraduationCap className="w-4 h-4" />
+              Learn How It Works
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Webcam view */}
-          <div className="lg:col-span-2">
-            <div className="glass-card rounded-2xl p-4">
-              <div className="relative aspect-video rounded-xl overflow-hidden bg-muted">
-                <Webcam
-                  ref={webcamRef}
-                  audio={false}
-                  screenshotFormat="image/jpeg"
-                  videoConstraints={{
-                    facingMode: "user",
-                    width: 1280,
-                    height: 720,
-                  }}
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-                <canvas
-                  ref={canvasRef}
-                  className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                />
-                {error && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 text-destructive p-4 text-center">
-                    {error}
+          <TabsContent value="demo" className="space-y-6">
+            <StatsDisplay stats={stats} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Webcam view */}
+              <div className="lg:col-span-2">
+                <div className="glass-card rounded-2xl p-4">
+                  <div className="relative aspect-video rounded-xl overflow-hidden bg-muted">
+                    <Webcam
+                      ref={webcamRef}
+                      audio={false}
+                      screenshotFormat="image/jpeg"
+                      videoConstraints={{
+                        facingMode: "user",
+                        width: 1280,
+                        height: 720,
+                      }}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    <canvas
+                      ref={canvasRef}
+                      className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                    />
+                    {error && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 text-destructive p-4 text-center">
+                        {error}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Scavenger hunt panel */}
-          <div className="glass-card rounded-2xl p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Target className="w-5 h-5 text-neon-green" />
-              <h3 className="text-lg font-semibold">Scavenger Hunt</h3>
-            </div>
-            
-            {!huntActive ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground mb-6">
-                  Find all the items in your surroundings!
-                </p>
-                <Button variant="gradient" onClick={startHunt} className="gap-2">
-                  <Play className="w-4 h-4" />
-                  Start Hunt
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Found: {foundItems.size}/{huntItems.length}
-                </p>
-                <div className="space-y-2">
-                  {huntItems.map((item) => (
-                    <div
-                      key={item.name}
-                      className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                        foundItems.has(item.name)
-                          ? "bg-neon-green/20 border border-neon-green/30"
-                          : "bg-muted/30"
-                      }`}
-                    >
-                      <span className="text-2xl">{item.emoji}</span>
-                      <span className={foundItems.has(item.name) ? "text-neon-green" : ""}>
-                        {item.name}
-                      </span>
-                      {foundItems.has(item.name) && (
-                        <CheckCircle className="w-5 h-5 text-neon-green ml-auto" />
-                      )}
-                    </div>
-                  ))}
+              {/* Scavenger hunt panel */}
+              <div className="glass-card rounded-2xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Target className="w-5 h-5 text-neon-green" />
+                  <h3 className="text-lg font-semibold">Scavenger Hunt</h3>
                 </div>
                 
-                {foundItems.size === huntItems.length && (
-                  <div className="text-center p-4 bg-neon-green/20 rounded-xl border border-neon-green/30">
-                    <p className="text-xl font-bold text-neon-green">🎉 You found everything!</p>
-                    <Button variant="outline" onClick={startHunt} className="mt-4">
-                      Play Again
+                {!huntActive ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-6">
+                      Find all the items in your surroundings!
+                    </p>
+                    <Button variant="gradient" onClick={startHunt} className="gap-2">
+                      <Play className="w-4 h-4" />
+                      Start Hunt
                     </Button>
                   </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Found: {foundItems.size}/{huntItems.length}
+                    </p>
+                    <div className="space-y-2">
+                      {huntItems.map((item) => (
+                        <div
+                          key={item.name}
+                          className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                            foundItems.has(item.name)
+                              ? "bg-neon-green/20 border border-neon-green/30"
+                              : "bg-muted/30"
+                          }`}
+                        >
+                          <span className="text-2xl">{item.emoji}</span>
+                          <span className={foundItems.has(item.name) ? "text-neon-green" : ""}>
+                            {item.name}
+                          </span>
+                          {foundItems.has(item.name) && (
+                            <CheckCircle className="w-5 h-5 text-neon-green ml-auto" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {foundItems.size === huntItems.length && (
+                      <div className="text-center p-4 bg-neon-green/20 rounded-xl border border-neon-green/30">
+                        <p className="text-xl font-bold text-neon-green">🎉 You found everything!</p>
+                        <Button variant="outline" onClick={startHunt} className="mt-4">
+                          Play Again
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
+                
+                <div className="mt-6 pt-4 border-t border-border">
+                  <h4 className="text-sm font-medium mb-2">Detectable Objects:</h4>
+                  <p className="text-xs text-muted-foreground">
+                    person, bicycle, car, motorcycle, airplane, bus, train, truck, boat, traffic light, 
+                    fire hydrant, stop sign, parking meter, bench, bird, cat, dog, horse, sheep, cow, 
+                    elephant, bear, zebra, giraffe, backpack, umbrella, handbag, tie, suitcase, frisbee...
+                  </p>
+                </div>
               </div>
-            )}
-            
-            <div className="mt-6 pt-4 border-t border-border">
-              <h4 className="text-sm font-medium mb-2">Detectable Objects:</h4>
-              <p className="text-xs text-muted-foreground">
-                person, bicycle, car, motorcycle, airplane, bus, train, truck, boat, traffic light, 
-                fire hydrant, stop sign, parking meter, bench, bird, cat, dog, horse, sheep, cow, 
-                elephant, bear, zebra, giraffe, backpack, umbrella, handbag, tie, suitcase, frisbee...
-              </p>
             </div>
-          </div>
-        </div>
+          </TabsContent>
+
+          <TabsContent value="learn">
+            <div className="glass-card rounded-2xl p-6">
+              <ModelLearnContent type="object" />
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
