@@ -1,8 +1,7 @@
 import { Scan, Hand, Package, Activity, FileText, Sparkles, Zap, Shield, ChevronDown, UserCheck, ImageMinus } from "lucide-react";
 import { FeatureCard } from "@/components/FeatureCard";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState, Suspense } from "react";
-import VisionScene3D from "@/components/VisionScene3D";
+import { useEffect, useState } from "react";
 const features = [{
   title: "Face Detection & Emotion",
   description: "Real-time face detection with emotion recognition using MediaPipe. Detect multiple faces and their emotional states.",
@@ -70,13 +69,11 @@ export default function Index() {
     setMounted(true);
   }, []);
   return <div className="min-h-screen bg-background overflow-hidden">
-      {/* 3D Vision Scene Background */}
-      <Suspense fallback={null}>
-        <VisionScene3D />
-      </Suspense>
-
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center z-10">
+      <section className="relative min-h-screen flex items-center justify-center">
+        {/* Animated background effects */}
+        <div className="absolute inset-0 bg-hero-gradient" />
+        <div className="absolute inset-0 grid-pattern opacity-30" />
         
         {/* Morphing floating orbs */}
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl animate-float animate-morph" />
