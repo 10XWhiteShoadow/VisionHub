@@ -209,6 +209,15 @@ export default function Index() {
               </div>
               <span className="font-bold text-gradient-animate">VisionHub</span>
             </div>
+            <Button 
+              className="group h-10 px-6 bg-card/50 backdrop-blur-lg border border-border/50 text-foreground transition-all duration-300 hover:bg-primary/10 hover:border-primary/50 hover:scale-105"
+              asChild
+            >
+              <a href="/docs" className="flex items-center gap-2">
+                <FileText className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12" />
+                <span className="group-hover:text-primary transition-colors duration-300">Documentation</span>
+              </a>
+            </Button>
             <p className="text-sm text-muted-foreground">
               Built with TensorFlow.js, MediaPipe & Tesseract.js
             </p>
