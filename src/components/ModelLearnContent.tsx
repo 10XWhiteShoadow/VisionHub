@@ -12,7 +12,9 @@ import {
   Grid3X3,
   Boxes,
   GitBranch,
-  Workflow
+  Workflow,
+  Zap,
+  ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,92 +24,146 @@ interface StepCardProps {
   description: string;
   icon: ReactNode;
   color: "cyan" | "purple" | "pink" | "green" | "orange";
+  isLast?: boolean;
 }
 
 const colorClasses = {
   cyan: {
     bg: "bg-neon-cyan/10",
+    bgSolid: "bg-neon-cyan",
     border: "border-neon-cyan/30",
+    borderHover: "hover:border-neon-cyan/60",
     text: "text-neon-cyan",
-    glow: "shadow-neon-cyan/20",
+    glow: "shadow-[0_0_30px_-5px_hsl(var(--neon-cyan)/0.3)]",
+    gradient: "from-neon-cyan/20 to-transparent",
   },
   purple: {
     bg: "bg-neon-purple/10",
+    bgSolid: "bg-neon-purple",
     border: "border-neon-purple/30",
+    borderHover: "hover:border-neon-purple/60",
     text: "text-neon-purple",
-    glow: "shadow-neon-purple/20",
+    glow: "shadow-[0_0_30px_-5px_hsl(var(--neon-purple)/0.3)]",
+    gradient: "from-neon-purple/20 to-transparent",
   },
   pink: {
     bg: "bg-neon-pink/10",
+    bgSolid: "bg-neon-pink",
     border: "border-neon-pink/30",
+    borderHover: "hover:border-neon-pink/60",
     text: "text-neon-pink",
-    glow: "shadow-neon-pink/20",
+    glow: "shadow-[0_0_30px_-5px_hsl(var(--neon-pink)/0.3)]",
+    gradient: "from-neon-pink/20 to-transparent",
   },
   green: {
     bg: "bg-neon-green/10",
+    bgSolid: "bg-neon-green",
     border: "border-neon-green/30",
+    borderHover: "hover:border-neon-green/60",
     text: "text-neon-green",
-    glow: "shadow-neon-green/20",
+    glow: "shadow-[0_0_30px_-5px_hsl(var(--neon-green)/0.3)]",
+    gradient: "from-neon-green/20 to-transparent",
   },
   orange: {
     bg: "bg-neon-orange/10",
+    bgSolid: "bg-neon-orange",
     border: "border-neon-orange/30",
+    borderHover: "hover:border-neon-orange/60",
     text: "text-neon-orange",
-    glow: "shadow-neon-orange/20",
+    glow: "shadow-[0_0_30px_-5px_hsl(var(--neon-orange)/0.3)]",
+    gradient: "from-neon-orange/20 to-transparent",
   },
 };
 
-function StepCard({ step, title, description, icon, color }: StepCardProps) {
+function StepCard({ step, title, description, icon, color, isLast }: StepCardProps) {
   const colors = colorClasses[color];
   return (
-    <div className={cn(
-      "relative p-4 rounded-xl border transition-all hover:scale-[1.02]",
-      colors.bg, colors.border, `hover:shadow-lg ${colors.glow}`
-    )}>
-      <div className="flex items-start gap-4">
+    <div className="relative flex gap-4 group">
+      {/* Timeline connector */}
+      <div className="flex flex-col items-center">
         <div className={cn(
-          "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center",
-          colors.bg, colors.text
+          "relative z-10 w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500",
+          "bg-gradient-to-br from-background to-card border-2",
+          colors.border,
+          colors.borderHover,
+          "group-hover:scale-110",
+          colors.glow
         )}>
-          {icon}
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", colors.bg, colors.text)}>
-              Step {step}
-            </span>
+          <div className={cn("transition-transform duration-300 group-hover:scale-110", colors.text)}>
+            {icon}
           </div>
-          <h4 className="font-semibold mb-1">{title}</h4>
-          <p className="text-sm text-muted-foreground">{description}</p>
         </div>
+        {!isLast && (
+          <div className={cn(
+            "w-0.5 h-full min-h-[60px] transition-all duration-500",
+            "bg-gradient-to-b",
+            colors.gradient
+          )} />
+        )}
+      </div>
+
+      {/* Content card */}
+      <div className={cn(
+        "flex-1 p-5 rounded-2xl border backdrop-blur-sm transition-all duration-300",
+        "bg-gradient-to-br from-card/80 to-card/40",
+        colors.border,
+        colors.borderHover,
+        "group-hover:translate-x-1",
+        "mb-4"
+      )}>
+        <div className="flex items-center gap-3 mb-2">
+          <span className={cn(
+            "text-[10px] font-black tracking-widest px-2.5 py-1 rounded-full uppercase",
+            colors.bg, colors.text
+          )}>
+            Step {step}
+          </span>
+        </div>
+        <h4 className="font-bold text-lg mb-2 group-hover:text-foreground transition-colors">{title}</h4>
+        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
       </div>
     </div>
   );
 }
 
-interface ArchitectureDiagramProps {
-  layers: { name: string; description: string }[];
+interface ArchitectureLayerProps {
+  layer: { name: string; description: string };
+  index: number;
+  total: number;
   color: "cyan" | "purple" | "pink" | "green" | "orange";
 }
 
-function ArchitectureDiagram({ layers, color }: ArchitectureDiagramProps) {
+function ArchitectureLayer({ layer, index, total, color }: ArchitectureLayerProps) {
   const colors = colorClasses[color];
+  const widthPercent = 100 - (index * (40 / total));
+  
   return (
-    <div className="space-y-2">
-      {layers.map((layer, index) => (
-        <div key={index} className="flex items-center gap-2">
-          <div className={cn(
-            "flex-1 p-3 rounded-lg border text-center transition-all hover:scale-[1.02]",
-            colors.bg, colors.border
-          )}>
-            <p className="font-medium text-sm">{layer.name}</p>
-            <p className="text-xs text-muted-foreground">{layer.description}</p>
-          </div>
-          {index < layers.length - 1 && (
-            <ArrowRight className={cn("w-4 h-4 rotate-90 flex-shrink-0", colors.text)} />
-          )}
+    <div className="flex flex-col items-center animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+      <div 
+        className={cn(
+          "relative p-4 rounded-xl border backdrop-blur-sm transition-all duration-300",
+          "hover:scale-[1.02] cursor-default group",
+          colors.bg, colors.border, colors.borderHover
+        )}
+        style={{ width: `${widthPercent}%` }}
+      >
+        {/* Glow effect */}
+        <div className={cn(
+          "absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10 blur-xl",
+          colors.bg
+        )} />
+        
+        <div className="text-center">
+          <p className={cn("font-semibold text-sm", colors.text)}>{layer.name}</p>
+          <p className="text-xs text-muted-foreground mt-1">{layer.description}</p>
         </div>
-      ))}
+      </div>
+      
+      {index < total - 1 && (
+        <div className="py-2">
+          <ChevronRight className={cn("w-5 h-5 rotate-90 animate-pulse", colors.text)} />
+        </div>
+      )}
     </div>
   );
 }
@@ -120,30 +176,46 @@ export function ModelLearnContent({ type }: ModelLearnContentProps) {
   const content = getContentByType(type);
   
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Header */}
-      <div className="text-center space-y-2">
+    <div className="space-y-10 animate-fade-in">
+      {/* Header with animated background */}
+      <div className="relative text-center space-y-4 py-8">
+        {/* Background glow */}
         <div className={cn(
-          "inline-flex items-center gap-2 px-4 py-2 rounded-full",
-          colorClasses[content.color].bg,
-          colorClasses[content.color].border,
-          "border"
+          "absolute inset-0 rounded-3xl opacity-30 blur-3xl -z-10",
+          colorClasses[content.color].bg
+        )} />
+        
+        <div className={cn(
+          "inline-flex items-center gap-2 px-5 py-2.5 rounded-full",
+          "bg-card/80 backdrop-blur-sm border",
+          colorClasses[content.color].border
         )}>
-          <Sparkles className={cn("w-4 h-4", colorClasses[content.color].text)} />
-          <span className="text-sm font-medium">Learn How It Works</span>
+          <Sparkles className={cn("w-4 h-4 animate-pulse", colorClasses[content.color].text)} />
+          <span className="text-sm font-semibold tracking-wide">Deep Dive</span>
         </div>
-        <h2 className="text-2xl font-bold">{content.title}</h2>
-        <p className="text-muted-foreground max-w-2xl mx-auto">{content.subtitle}</p>
+        
+        <h2 className="text-3xl md:text-4xl font-black">
+          <span className="text-gradient-animate">{content.title}</span>
+        </h2>
+        <p className="text-muted-foreground max-w-2xl mx-auto text-lg leading-relaxed">
+          {content.subtitle}
+        </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8">
-        {/* Left: How the Model Works */}
+      <div className="grid lg:grid-cols-2 gap-10">
+        {/* Left: How the Model Works - Timeline */}
         <div className="space-y-6">
-          <div className="flex items-center gap-2 mb-4">
+          <div className={cn(
+            "inline-flex items-center gap-3 px-4 py-2 rounded-xl",
+            colorClasses[content.color].bg,
+            "border",
+            colorClasses[content.color].border
+          )}>
             <Brain className={cn("w-5 h-5", colorClasses[content.color].text)} />
-            <h3 className="text-lg font-semibold">How It Works</h3>
+            <h3 className="text-lg font-bold">Processing Pipeline</h3>
           </div>
-          <div className="space-y-4">
+          
+          <div className="pl-2">
             {content.steps.map((step, index) => (
               <StepCard
                 key={index}
@@ -152,37 +224,66 @@ export function ModelLearnContent({ type }: ModelLearnContentProps) {
                 description={step.description}
                 icon={step.icon}
                 color={content.color}
+                isLast={index === content.steps.length - 1}
               />
             ))}
           </div>
         </div>
 
-        {/* Right: Architecture & Tech Stack */}
+        {/* Right: Architecture & Info */}
         <div className="space-y-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Layers className={cn("w-5 h-5", colorClasses[content.color].text)} />
-            <h3 className="text-lg font-semibold">Model Architecture</h3>
+          {/* Architecture Diagram */}
+          <div className={cn(
+            "p-6 rounded-2xl border backdrop-blur-sm",
+            "bg-gradient-to-br from-card/80 to-card/40",
+            colorClasses[content.color].border
+          )}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center",
+                colorClasses[content.color].bg
+              )}>
+                <Layers className={cn("w-5 h-5", colorClasses[content.color].text)} />
+              </div>
+              <h3 className="text-lg font-bold">Neural Architecture</h3>
+            </div>
+            
+            <div className="space-y-2">
+              {content.architecture.map((layer, index) => (
+                <ArchitectureLayer
+                  key={index}
+                  layer={layer}
+                  index={index}
+                  total={content.architecture.length}
+                  color={content.color}
+                />
+              ))}
+            </div>
           </div>
-          
-          <ArchitectureDiagram layers={content.architecture} color={content.color} />
 
           {/* Tech Stack */}
           <div className={cn(
-            "p-4 rounded-xl border",
-            colorClasses[content.color].bg,
+            "p-5 rounded-2xl border backdrop-blur-sm",
+            "bg-gradient-to-br from-card/80 to-card/40",
             colorClasses[content.color].border
           )}>
-            <div className="flex items-center gap-2 mb-3">
-              <Code2 className={cn("w-4 h-4", colorClasses[content.color].text)} />
-              <h4 className="font-medium">Technologies Used</h4>
+            <div className="flex items-center gap-3 mb-4">
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center",
+                colorClasses[content.color].bg
+              )}>
+                <Code2 className={cn("w-4 h-4", colorClasses[content.color].text)} />
+              </div>
+              <h4 className="font-bold">Tech Stack</h4>
             </div>
             <div className="flex flex-wrap gap-2">
               {content.techStack.map((tech, index) => (
                 <span
                   key={index}
                   className={cn(
-                    "px-3 py-1 rounded-full text-xs font-medium",
-                    "bg-background/50 border border-border"
+                    "px-4 py-2 rounded-full text-sm font-medium transition-all duration-300",
+                    "bg-background/60 border border-border/50",
+                    "hover:border-primary/50 hover:scale-105 cursor-default"
                   )}
                 >
                   {tech}
@@ -193,19 +294,32 @@ export function ModelLearnContent({ type }: ModelLearnContentProps) {
 
           {/* Key Concepts */}
           <div className={cn(
-            "p-4 rounded-xl border",
-            colorClasses[content.color].bg,
+            "p-5 rounded-2xl border backdrop-blur-sm",
+            "bg-gradient-to-br from-card/80 to-card/40",
             colorClasses[content.color].border
           )}>
-            <div className="flex items-center gap-2 mb-3">
-              <Lightbulb className={cn("w-4 h-4", colorClasses[content.color].text)} />
-              <h4 className="font-medium">Key Concepts</h4>
+            <div className="flex items-center gap-3 mb-4">
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center",
+                colorClasses[content.color].bg
+              )}>
+                <Lightbulb className={cn("w-4 h-4", colorClasses[content.color].text)} />
+              </div>
+              <h4 className="font-bold">Key Insights</h4>
             </div>
-            <ul className="space-y-2 text-sm text-muted-foreground">
+            <ul className="space-y-3">
               {content.keyConcepts.map((concept, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <ArrowRight className={cn("w-3 h-3 mt-1 flex-shrink-0", colorClasses[content.color].text)} />
-                  <span>{concept}</span>
+                <li key={index} className="flex items-start gap-3 group">
+                  <div className={cn(
+                    "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 transition-all duration-300",
+                    colorClasses[content.color].bg,
+                    "group-hover:scale-110"
+                  )}>
+                    <Zap className={cn("w-3 h-3", colorClasses[content.color].text)} />
+                  </div>
+                  <span className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground transition-colors">
+                    {concept}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -213,10 +327,12 @@ export function ModelLearnContent({ type }: ModelLearnContentProps) {
 
           {/* Learn More */}
           {content.resources && (
-            <div className="p-4 rounded-xl bg-muted/30 border border-border">
-              <div className="flex items-center gap-2 mb-3">
-                <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                <h4 className="font-medium text-sm">Learn More</h4>
+            <div className="p-5 rounded-2xl bg-muted/20 border border-border/50">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center">
+                  <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <h4 className="font-bold">Resources</h4>
               </div>
               <ul className="space-y-2">
                 {content.resources.map((resource, index) => (
@@ -225,10 +341,15 @@ export function ModelLearnContent({ type }: ModelLearnContentProps) {
                       href={resource.url} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline flex items-center gap-1"
+                      className={cn(
+                        "flex items-center gap-2 text-sm transition-all duration-300",
+                        "text-muted-foreground hover:text-primary",
+                        "group/link"
+                      )}
                     >
+                      <ArrowRight className="w-4 h-4 transition-transform group-hover/link:translate-x-1" />
                       {resource.name}
-                      <ExternalLink className="w-3 h-3" />
+                      <ExternalLink className="w-3 h-3 opacity-0 group-hover/link:opacity-100 transition-opacity" />
                     </a>
                   </li>
                 ))}
@@ -455,84 +576,84 @@ function getContentByType(type: ModelLearnContentProps["type"]): ContentData {
           },
           {
             title: "Text Detection",
-            description: "Tesseract segments the image into text lines and words using connected components.",
+            description: "LSTM-based neural network segments and recognizes text line by line.",
             icon: <Grid3X3 className="w-5 h-5" />,
           },
           {
             title: "Character Recognition",
-            description: "LSTM neural network classifies each character based on shape patterns.",
+            description: "Each character is classified using trained pattern matching and language models.",
             icon: <Brain className="w-5 h-5" />,
           },
           {
-            title: "AI Correction",
-            description: "Language model post-processes text to fix OCR errors and improve accuracy.",
+            title: "AI Enhancement",
+            description: "Gemini AI corrects spelling mistakes and provides accurate translations.",
             icon: <Sparkles className="w-5 h-5" />,
           },
         ],
         architecture: [
-          { name: "Raw Image", description: "Camera capture / upload" },
-          { name: "Preprocessing", description: "Contrast, grayscale, sharpen" },
-          { name: "Tesseract Engine", description: "LSTM-based OCR" },
-          { name: "AI Correction", description: "LLM error correction" },
-          { name: "Output", description: "Clean extracted text" },
+          { name: "Input Image", description: "Captured frame from webcam" },
+          { name: "Preprocessing", description: "Scale, contrast, sharpen" },
+          { name: "Tesseract LSTM", description: "Character segmentation" },
+          { name: "Gemini AI", description: "Error correction & translation" },
+          { name: "Output", description: "Clean text + translations" },
         ],
-        techStack: ["Tesseract.js", "Canvas API", "Lovable AI", "WebWorkers"],
+        techStack: ["Tesseract.js", "Gemini AI", "Canvas API", "Edge Functions"],
         keyConcepts: [
-          "LSTM networks handle variable-length sequences of characters",
-          "Image preprocessing dramatically improves recognition accuracy",
-          "Multi-language support through trained language data files",
-          "AI post-processing catches context-dependent errors",
+          "LSTM networks handle variable-length sequences for text recognition",
+          "Image preprocessing (3x scale, contrast) significantly improves accuracy",
+          "AI post-processing catches errors that raw OCR misses",
+          "Language-specific models improve recognition for non-English text",
         ],
         resources: [
-          { name: "Tesseract.js Docs", url: "https://tesseract.projectnaptha.com/" },
-          { name: "OCR Wikipedia", url: "https://en.wikipedia.org/wiki/Optical_character_recognition" },
+          { name: "Tesseract.js Documentation", url: "https://tesseract.projectnaptha.com/" },
+          { name: "OCR Best Practices", url: "https://tesseract-ocr.github.io/tessdoc/ImproveQuality.html" },
         ],
       };
 
     case "background":
       return {
         title: "AI Background Removal",
-        subtitle: "Discover how transformer-based segmentation models separate subjects from backgrounds.",
+        subtitle: "Explore how transformer models segment foreground subjects from backgrounds.",
         color: "purple",
         steps: [
           {
             title: "Image Encoding",
-            description: "The image is divided into patches and encoded by a Vision Transformer (ViT).",
+            description: "The image is processed through a vision transformer to extract features.",
+            icon: <Eye className="w-5 h-5" />,
+          },
+          {
+            title: "Segmentation",
+            description: "The model predicts a mask distinguishing foreground from background pixels.",
             icon: <Grid3X3 className="w-5 h-5" />,
           },
           {
-            title: "Semantic Segmentation",
-            description: "Each pixel is classified as foreground (subject) or background.",
-            icon: <Layers className="w-5 h-5" />,
-          },
-          {
-            title: "Alpha Matte Generation",
-            description: "Edge refinement produces smooth alpha channel for clean cutouts.",
+            title: "Mask Refinement",
+            description: "Edge detection and smoothing create clean, natural-looking cutouts.",
             icon: <Boxes className="w-5 h-5" />,
           },
           {
             title: "Compositing",
-            description: "Foreground is composited onto new backgrounds (transparent, solid, or image).",
-            icon: <Workflow className="w-5 h-5" />,
+            description: "The subject is combined with new backgrounds or transparency.",
+            icon: <Layers className="w-5 h-5" />,
           },
         ],
         architecture: [
-          { name: "Input Image", description: "User uploaded photo" },
-          { name: "Vision Transformer", description: "Patch-based encoding" },
+          { name: "Input Image", description: "User uploaded or captured" },
+          { name: "Vision Transformer", description: "Feature extraction" },
           { name: "Segmentation Head", description: "Per-pixel classification" },
-          { name: "Alpha Refinement", description: "Edge smoothing" },
-          { name: "Output", description: "RGBA image with transparency" },
+          { name: "Mask Post-Processing", description: "Refinement & smoothing" },
+          { name: "Output", description: "Transparent PNG" },
         ],
-        techStack: ["Hugging Face Transformers", "@huggingface/transformers", "WebGPU", "Canvas API"],
+        techStack: ["Transformers.js", "RMBG-1.4", "Canvas API", "WebGPU"],
         keyConcepts: [
-          "Transformers use self-attention to capture global image context",
-          "Semantic segmentation assigns a class label to every pixel",
-          "Alpha mattes enable smooth foreground-background blending",
-          "Manual brush editing allows fine-tuning of automatic results",
+          "Vision Transformers (ViT) process images as sequences of patches",
+          "Self-attention captures global context for better segmentation",
+          "Alpha matting handles semi-transparent edges like hair",
+          "WebGPU acceleration enables real-time processing in browsers",
         ],
         resources: [
-          { name: "Hugging Face Transformers.js", url: "https://huggingface.co/docs/transformers.js" },
-          { name: "Vision Transformers (ViT)", url: "https://arxiv.org/abs/2010.11929" },
+          { name: "Transformers.js", url: "https://huggingface.co/docs/transformers.js" },
+          { name: "RMBG Model", url: "https://huggingface.co/briaai/RMBG-1.4" },
         ],
       };
   }
