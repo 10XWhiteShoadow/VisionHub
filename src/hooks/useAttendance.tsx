@@ -214,15 +214,84 @@ export const useAttendance = () => {
     });
   };
 
+  const removePresent = async (recordId: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from("attendance_records")
+      .delete()
+      .eq("id", recordId);
+
+    if (error) {
+      logger.error("useAttendance", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove attendance record",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    setRecords((prev) => prev.filter((r) => r.id !== recordId));
+    return true;
+  };
+
+  const syncToGoogleSheets = async (): Promise<{ success: boolean; synced?: number }> => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-attendance-sheets`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            action: "sync",
+            records: records.map((r) => ({
+              student_name: r.studentName,
+              roll_no: r.rollNo,
+              status: r.status,
+              date: r.date,
+              marked_at: r.markedAt,
+            })),
+          }),
+        }
+      );
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to sync");
+      }
+
+      toast({
+        title: "Synced to Google Sheets!",
+        description: `${data.synced} records synced to ${data.sheetName}`,
+      });
+
+      return { success: true, synced: data.synced };
+    } catch (error) {
+      logger.error("useAttendance", error);
+      toast({
+        title: "Sync Failed",
+        description: error instanceof Error ? error.message : "Failed to sync to Google Sheets",
+        variant: "destructive",
+      });
+      return { success: false };
+    }
+  };
+
   return {
     records,
     loading,
     saving,
     markPresent,
+    removePresent,
     saveAllAttendance,
     exportToCSV,
     fetchTodayAttendance,
     fetchAttendanceByDate,
     fetchAllAttendance,
+    syncToGoogleSheets,
   };
 };
