@@ -31,25 +31,40 @@ serve(async (req) => {
     let userPrompt = "";
 
     if (action === "correct") {
-      systemPrompt = `You are an OCR text correction specialist. Your task is to:
-1. Fix spelling mistakes and typos
-2. Correct OCR errors (like 'l' misread as '1', 'O' as '0', etc.)
-3. Fix missing or extra spaces
-4. Preserve the original meaning and structure
-5. Do NOT add any explanations, just output the corrected text.`;
-      userPrompt = `Correct this OCR-extracted text:\n\n${text}`;
+      systemPrompt = `You are an expert OCR text correction AI. Your ONLY job is to fix OCR errors.
+
+COMMON OCR MISTAKES TO FIX:
+- Character confusion: l/1/I, O/0, S/5, B/8, rn/m, cl/d, vv/w
+- Missing/extra spaces between words
+- Broken words across lines
+- Punctuation errors (.  , ' " - etc.)
+- Case errors from misrecognition
+
+RULES:
+1. Output ONLY the corrected text - no explanations, no notes, no quotes
+2. Preserve original formatting (paragraphs, line breaks) 
+3. If text is gibberish, try to infer the most likely intended words
+4. Keep proper nouns and technical terms intact when clear`;
+      userPrompt = `Fix all OCR errors in this text and output only the corrected version:\n\n${text}`;
     } else if (action === "translate") {
-      systemPrompt = `You are a professional translator. Translate the given text accurately to ${targetLanguage}. 
-Only output the translation, no explanations or notes.`;
+      systemPrompt = `You are a professional translator. Translate accurately to ${targetLanguage}.
+Output ONLY the translation - no explanations, no original text, no notes.`;
       userPrompt = `Translate to ${targetLanguage}:\n\n${text}`;
     } else if (action === "both") {
-      systemPrompt = `You are an OCR text processor. Your task is to:
-1. First, correct any spelling mistakes, typos, and OCR errors
-2. Then translate the corrected text to ${targetLanguage}
+      systemPrompt = `You are an OCR correction and translation AI.
 
-Respond in this exact JSON format:
-{"correctedText": "the corrected text here", "translatedText": "the translation here"}`;
-      userPrompt = `Process this OCR text:\n\n${text}`;
+STEP 1 - Fix OCR errors:
+- Fix character confusion (l/1/I, O/0, rn/m, etc.)
+- Fix spacing issues
+- Correct obvious typos and misrecognitions
+
+STEP 2 - Translate the corrected text to ${targetLanguage}
+
+CRITICAL: You MUST respond with ONLY valid JSON in this exact format:
+{"correctedText": "the corrected English text", "translatedText": "the ${targetLanguage} translation"}
+
+No markdown, no code blocks, no explanations - JUST the JSON object.`;
+      userPrompt = `OCR text to correct and translate:\n\n${text}`;
     }
 
     console.log(`Processing OCR text with action: ${action}, target language: ${targetLanguage}`);
@@ -95,20 +110,52 @@ Respond in this exact JSON format:
     let result;
     if (action === "both") {
       try {
+        // Clean markdown code blocks if present
+        let cleanContent = content.trim();
+        if (cleanContent.startsWith("```json")) {
+          cleanContent = cleanContent.slice(7);
+        } else if (cleanContent.startsWith("```")) {
+          cleanContent = cleanContent.slice(3);
+        }
+        if (cleanContent.endsWith("```")) {
+          cleanContent = cleanContent.slice(0, -3);
+        }
+        cleanContent = cleanContent.trim();
+        
         // Try to parse JSON response
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           result = JSON.parse(jsonMatch[0]);
+          // Validate required fields exist
+          if (!result.correctedText) result.correctedText = text;
+          if (!result.translatedText) result.translatedText = "";
         } else {
-          result = { correctedText: text, translatedText: content };
+          // If no JSON found, treat entire response as translation
+          console.warn("No JSON found in response, using fallback");
+          result = { correctedText: text, translatedText: cleanContent };
         }
-      } catch {
-        result = { correctedText: text, translatedText: content };
+      } catch (parseErr) {
+        console.error("JSON parse error:", parseErr);
+        // Fallback: try to extract text intelligently
+        const lines = content.split('\n').filter((l: string) => l.trim());
+        result = { 
+          correctedText: text, 
+          translatedText: lines.length > 0 ? lines[lines.length - 1] : content 
+        };
       }
     } else if (action === "correct") {
-      result = { correctedText: content, translatedText: "" };
+      // Strip any quotes or formatting
+      let cleaned = content.trim();
+      if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+        cleaned = cleaned.slice(1, -1);
+      }
+      result = { correctedText: cleaned, translatedText: "" };
     } else {
-      result = { correctedText: text, translatedText: content };
+      let cleaned = content.trim();
+      if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+        cleaned = cleaned.slice(1, -1);
+      }
+      result = { correctedText: text, translatedText: cleaned };
     }
 
     return new Response(JSON.stringify(result), {

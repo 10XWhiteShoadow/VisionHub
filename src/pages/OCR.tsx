@@ -67,83 +67,93 @@ export default function OCR() {
     };
   }, [ocrLang]);
 
-  // Advanced image preprocessing for better OCR
+  // Advanced image preprocessing for better OCR - IMPROVED
   const preprocessImage = useCallback((imageData: string): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
         if (!ctx) {
           resolve(imageData);
           return;
         }
 
-        // Scale up 3x for better recognition
-        const scale = 3;
+        // Scale up 2x (not 3x - too much can blur text)
+        const scale = 2;
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
         
-        // Use high quality scaling
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
+        // Disable smoothing for sharper text
+        ctx.imageSmoothingEnabled = false;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         
         // Get image data for processing
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imgData.data;
         
-        // Apply adaptive thresholding with Otsu's method approximation
-        let histogram = new Array(256).fill(0);
-        let totalPixels = data.length / 4;
+        // Step 1: Convert to grayscale and collect stats
+        const grayscale = new Uint8Array(data.length / 4);
+        let minGray = 255, maxGray = 0;
         
         for (let i = 0; i < data.length; i += 4) {
           const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-          histogram[gray]++;
+          grayscale[i / 4] = gray;
+          if (gray < minGray) minGray = gray;
+          if (gray > maxGray) maxGray = gray;
         }
         
-        // Find optimal threshold using Otsu's method
-        let sum = 0;
-        for (let i = 0; i < 256; i++) sum += i * histogram[i];
+        // Step 2: Apply contrast stretching (normalize to full 0-255 range)
+        const range = maxGray - minGray || 1;
+        for (let i = 0; i < grayscale.length; i++) {
+          grayscale[i] = Math.round(((grayscale[i] - minGray) / range) * 255);
+        }
         
-        let sumB = 0, wB = 0, wF = 0;
-        let maxVariance = 0, threshold = 128;
+        // Step 3: Apply sharpening using unsharp mask
+        const width = canvas.width;
+        const height = canvas.height;
+        const sharpened = new Uint8Array(grayscale.length);
+        const sharpenAmount = 0.5;
         
-        for (let t = 0; t < 256; t++) {
-          wB += histogram[t];
-          if (wB === 0) continue;
-          wF = totalPixels - wB;
-          if (wF === 0) break;
-          
-          sumB += t * histogram[t];
-          const mB = sumB / wB;
-          const mF = (sum - sumB) / wF;
-          const variance = wB * wF * (mB - mF) * (mB - mF);
-          
-          if (variance > maxVariance) {
-            maxVariance = variance;
-            threshold = t;
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+            // Simple 3x3 blur for unsharp mask
+            const blur = (
+              grayscale[idx - width - 1] + grayscale[idx - width] + grayscale[idx - width + 1] +
+              grayscale[idx - 1] + grayscale[idx] + grayscale[idx + 1] +
+              grayscale[idx + width - 1] + grayscale[idx + width] + grayscale[idx + width + 1]
+            ) / 9;
+            
+            const sharp = Math.round(grayscale[idx] + sharpenAmount * (grayscale[idx] - blur));
+            sharpened[idx] = Math.max(0, Math.min(255, sharp));
           }
         }
         
-        // Apply threshold and enhance contrast
+        // Step 4: Apply adaptive thresholding OR keep grayscale (grayscale often works better)
+        // For OCR, high-contrast grayscale often outperforms binary
+        const useBinary = false; // Keep grayscale for better OCR
+        
         for (let i = 0; i < data.length; i += 4) {
-          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          const pixelIdx = i / 4;
+          const value = sharpened[pixelIdx] || grayscale[pixelIdx];
           
-          // Increase contrast
-          const contrast = 2.0;
-          const adjusted = ((gray - 128) * contrast) + 128;
-          
-          // Apply binarization with computed threshold
-          const binary = adjusted > threshold ? 255 : 0;
-          
-          data[i] = binary;
-          data[i + 1] = binary;
-          data[i + 2] = binary;
+          if (useBinary) {
+            // Use local adaptive threshold
+            const binary = value > 127 ? 255 : 0;
+            data[i] = binary;
+            data[i + 1] = binary;
+            data[i + 2] = binary;
+          } else {
+            // Keep as high-contrast grayscale
+            data[i] = value;
+            data[i + 1] = value;
+            data[i + 2] = value;
+          }
         }
         
         ctx.putImageData(imgData, 0, 0);
-        resolve(canvas.toDataURL("image/png"));
+        resolve(canvas.toDataURL("image/png", 1.0));
       };
       img.src = imageData;
     });
