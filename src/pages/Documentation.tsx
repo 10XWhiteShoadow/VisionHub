@@ -28,11 +28,17 @@ import {
   Flame,
   ExternalLink,
   ChevronRight,
-  Target
+  Target,
+  Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import visionHubLogo from "@/assets/visionhub-logo.png";
+
+const handleExportPDF = () => {
+  window.print();
+};
 
 interface FeatureDetailProps {
   icon: React.ElementType;
@@ -341,7 +347,7 @@ export default function Documentation() {
               </div>
 
               {/* CTA */}
-              <div className="flex flex-wrap justify-center gap-4">
+              <div className="flex flex-wrap justify-center gap-4 print:hidden">
                 <Link 
                   to="/"
                   className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-primary to-secondary text-primary-foreground font-bold hover:scale-105 transition-transform shadow-lg shadow-primary/30"
@@ -355,6 +361,13 @@ export default function Documentation() {
                 >
                   View All Features
                 </a>
+                <Button
+                  onClick={handleExportPDF}
+                  className="inline-flex items-center gap-2 px-8 py-4 h-auto rounded-xl bg-neon-green/20 border border-neon-green/50 text-neon-green font-bold hover:bg-neon-green/30 hover:scale-105 transition-all"
+                >
+                  <Download className="w-5 h-5" />
+                  Export as PDF
+                </Button>
               </div>
             </div>
           </div>
