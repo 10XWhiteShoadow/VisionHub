@@ -169,7 +169,7 @@ function ArchitectureLayer({ layer, index, total, color }: ArchitectureLayerProp
 }
 
 interface ModelLearnContentProps {
-  type: "face" | "hand" | "object" | "pose" | "ocr" | "background";
+  type: "face" | "hand" | "object" | "pose" | "ocr" | "background" | "attendance";
 }
 
 export function ModelLearnContent({ type }: ModelLearnContentProps) {
@@ -654,6 +654,53 @@ function getContentByType(type: ModelLearnContentProps["type"]): ContentData {
         resources: [
           { name: "Transformers.js", url: "https://huggingface.co/docs/transformers.js" },
           { name: "RMBG Model", url: "https://huggingface.co/briaai/RMBG-1.4" },
+        ],
+      };
+
+    case "attendance":
+      return {
+        title: "Face-Based Attendance System",
+        subtitle: "Discover how facial recognition automates attendance tracking with voice feedback.",
+        color: "green",
+        steps: [
+          {
+            title: "Face Detection",
+            description: "MediaPipe BlazeFace detects faces in real-time from the webcam feed.",
+            icon: <Eye className="w-5 h-5" />,
+          },
+          {
+            title: "Face Region Extraction",
+            description: "Detected face regions are cropped and normalized for comparison.",
+            icon: <Grid3X3 className="w-5 h-5" />,
+          },
+          {
+            title: "Histogram Matching",
+            description: "Color histograms of detected faces are compared against registered student photos.",
+            icon: <Brain className="w-5 h-5" />,
+          },
+          {
+            title: "Auto-Mark & Announce",
+            description: "When confidence exceeds threshold, attendance is marked and name is announced.",
+            icon: <Sparkles className="w-5 h-5" />,
+          },
+        ],
+        architecture: [
+          { name: "Webcam Input", description: "Live video stream" },
+          { name: "BlazeFace Detector", description: "GPU-accelerated face detection" },
+          { name: "Face ROI Extraction", description: "32x32 normalized regions" },
+          { name: "Histogram Correlation", description: "Color-based similarity scoring" },
+          { name: "Output", description: "Matched student + voice announcement" },
+        ],
+        techStack: ["MediaPipe", "Web Speech API", "Supabase", "Canvas API"],
+        keyConcepts: [
+          "Histogram correlation compares color distributions (0-1 similarity score)",
+          "Stabilization prevents flickering by requiring consistent matches over frames",
+          "Cooldown period prevents duplicate markings for the same student",
+          "Web Speech API enables text-to-speech announcements",
+        ],
+        resources: [
+          { name: "MediaPipe Face Detection", url: "https://ai.google.dev/edge/mediapipe/solutions/vision/face_detector" },
+          { name: "Web Speech API", url: "https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API" },
         ],
       };
   }

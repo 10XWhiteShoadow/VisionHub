@@ -321,222 +321,244 @@ export default function OCR() {
           </Button>
         </div>
 
-        {/* Settings panel */}
-        {showSettings && (
-          <div className="glass-card rounded-2xl p-4 mb-6">
-            <h4 className="font-medium mb-3">OCR Language (source text)</h4>
-            <div className="flex gap-2 flex-wrap">
-              {ocrLanguages.map((lang) => (
-                <Button
-                  key={lang.code}
-                  variant={ocrLang === lang.code ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setOcrLang(lang.code)}
-                >
-                  {lang.name}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Tabs for Demo and Learn */}
+        <Tabs defaultValue="demo" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="demo" className="gap-2">
+              <Video className="w-4 h-4" />
+              Live Demo
+            </TabsTrigger>
+            <TabsTrigger value="learn" className="gap-2">
+              <GraduationCap className="w-4 h-4" />
+              Learn How It Works
+            </TabsTrigger>
+          </TabsList>
 
-        {extractedText && <StatsDisplay stats={stats} className="mb-6" />}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Camera / Captured image */}
-          <div className="glass-card rounded-2xl p-4">
-            {!capturedImage ? (
-              <>
-                <div className="relative aspect-video rounded-xl overflow-hidden bg-muted">
-                  <Webcam
-                    ref={webcamRef}
-                    audio={false}
-                    screenshotFormat="image/jpeg"
-                    videoConstraints={{
-                      facingMode: "environment",
-                      width: 1920,
-                      height: 1080,
-                    }}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <Button
-                  variant="gradient"
-                  className="w-full mt-4 gap-2"
-                  onClick={captureImage}
-                >
-                  <Camera className="w-5 h-5" />
-                  Capture & Extract Text
-                </Button>
-              </>
-            ) : (
-              <>
-                <div className="relative rounded-xl overflow-hidden">
-                  <img
-                    src={processedImage || capturedImage}
-                    alt="Captured"
-                    className="w-full aspect-video object-cover"
-                  />
-                  {isProcessing && (
-                    <div className="absolute inset-0 bg-background/80 backdrop-blur flex flex-col items-center justify-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-                      <div className="w-48 h-2 bg-muted rounded-full overflow-hidden mb-4">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-300"
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Processing... {progress}%
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <Button
-                    variant="outline"
-                    className="flex-1 gap-2"
-                    onClick={retake}
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Capture New
-                  </Button>
-                  {extractedText && (
+          <TabsContent value="demo" className="space-y-6">
+            {/* Settings panel */}
+            {showSettings && (
+              <div className="glass-card rounded-2xl p-4">
+                <h4 className="font-medium mb-3">OCR Language (source text)</h4>
+                <div className="flex gap-2 flex-wrap">
+                  {ocrLanguages.map((lang) => (
                     <Button
-                      variant="default"
-                      className="flex-1 gap-2"
-                      onClick={() => processImage(processedImage || capturedImage!)}
+                      key={lang.code}
+                      variant={ocrLang === lang.code ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setOcrLang(lang.code)}
                     >
-                      <RefreshCw className="w-4 h-4" />
-                      Retry OCR
+                      {lang.name}
                     </Button>
-                  )}
+                  ))}
                 </div>
-              </>
+              </div>
             )}
-          </div>
 
-          {/* Results panel */}
-          <div className="space-y-6">
-            {/* Extracted text (raw OCR) */}
-            <div className="glass-card rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-neon-cyan" />
-                  Raw OCR Text
-                </h3>
-              </div>
-              <div className="min-h-[80px] p-4 bg-card rounded-xl border border-border">
-                {extractedText ? (
-                  <p className="font-mono text-sm whitespace-pre-wrap text-muted-foreground">{extractedText}</p>
+            {extractedText && <StatsDisplay stats={stats} />}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Camera / Captured image */}
+              <div className="glass-card rounded-2xl p-4">
+                {!capturedImage ? (
+                  <>
+                    <div className="relative aspect-video rounded-xl overflow-hidden bg-muted">
+                      <Webcam
+                        ref={webcamRef}
+                        audio={false}
+                        screenshotFormat="image/jpeg"
+                        videoConstraints={{
+                          facingMode: "environment",
+                          width: 1920,
+                          height: 1080,
+                        }}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <Button
+                      variant="gradient"
+                      className="w-full mt-4 gap-2"
+                      onClick={captureImage}
+                    >
+                      <Camera className="w-5 h-5" />
+                      Capture & Extract Text
+                    </Button>
+                  </>
                 ) : (
-                  <p className="text-muted-foreground text-sm">
-                    {isProcessing
-                      ? "Extracting text from image..."
-                      : "Capture an image with text to extract it"}
-                  </p>
+                  <>
+                    <div className="relative rounded-xl overflow-hidden">
+                      <img
+                        src={processedImage || capturedImage}
+                        alt="Captured"
+                        className="w-full aspect-video object-cover"
+                      />
+                      {isProcessing && (
+                        <div className="absolute inset-0 bg-background/80 backdrop-blur flex flex-col items-center justify-center">
+                          <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+                          <div className="w-48 h-2 bg-muted rounded-full overflow-hidden mb-4">
+                            <div
+                              className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-300"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Processing... {progress}%
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <Button
+                        variant="outline"
+                        className="flex-1 gap-2"
+                        onClick={retake}
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Capture New
+                      </Button>
+                      {extractedText && (
+                        <Button
+                          variant="default"
+                          className="flex-1 gap-2"
+                          onClick={() => processImage(processedImage || capturedImage!)}
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Retry OCR
+                        </Button>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
-            </div>
 
-            {/* AI Corrected text */}
+              {/* Results panel */}
+              <div className="space-y-6">
+                {/* Extracted text (raw OCR) */}
+                <div className="glass-card rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-neon-cyan" />
+                      Raw OCR Text
+                    </h3>
+                  </div>
+                  <div className="min-h-[80px] p-4 bg-card rounded-xl border border-border">
+                    {extractedText ? (
+                      <p className="font-mono text-sm whitespace-pre-wrap text-muted-foreground">{extractedText}</p>
+                    ) : (
+                      <p className="text-muted-foreground text-sm">
+                        {isProcessing
+                          ? "Extracting text from image..."
+                          : "Capture an image with text to extract it"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* AI Corrected text */}
+                <div className="glass-card rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-neon-green" />
+                      AI Corrected Text
+                      {isAiProcessing && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
+                    </h3>
+                    {correctedText && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(correctedText)}
+                        className="gap-2"
+                      >
+                        <Copy className="w-4 h-4" />
+                        Copy
+                      </Button>
+                    )}
+                  </div>
+                  <div className="min-h-[100px] p-4 bg-card rounded-xl border border-border">
+                    {correctedText ? (
+                      <p className="font-mono text-sm whitespace-pre-wrap">{correctedText}</p>
+                    ) : (
+                      <p className="text-muted-foreground text-sm">
+                        {isAiProcessing
+                          ? "AI is correcting spelling and errors..."
+                          : "Corrected text will appear here"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Translation */}
+                <div className="glass-card rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Languages className="w-5 h-5 text-neon-purple" />
+                      Translation
+                      {isAiProcessing && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
+                    </h3>
+                    {translatedText && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(translatedText)}
+                        className="gap-2"
+                      >
+                        <Copy className="w-4 h-4" />
+                        Copy
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Language selection */}
+                  <div className="flex gap-2 mb-4 flex-wrap">
+                    {languages.map((lang) => (
+                      <Button
+                        key={lang.code}
+                        variant={selectedLang === lang.code ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => changeLanguage(lang.code)}
+                        className="gap-2"
+                        disabled={isAiProcessing}
+                      >
+                        <span>{lang.flag}</span>
+                        <span className="hidden sm:inline">{lang.name}</span>
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="min-h-[120px] p-4 bg-card rounded-xl border border-border">
+                    {translatedText ? (
+                      <p className="font-mono text-sm whitespace-pre-wrap">{translatedText}</p>
+                    ) : (
+                      <p className="text-muted-foreground text-sm">
+                        {isAiProcessing 
+                          ? "AI is translating..." 
+                          : "Translation will appear here after text extraction"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tips */}
+                <div className="glass-card rounded-2xl p-6">
+                  <h4 className="font-medium mb-3">Tips for best results:</h4>
+                  <ul className="text-sm text-muted-foreground space-y-2">
+                    <li>• Use <strong>printed text</strong> (typed, not handwritten)</li>
+                    <li>• Ensure <strong>good lighting</strong> without glare</li>
+                    <li>• Hold camera <strong>steady and straight</strong></li>
+                    <li>• <strong>Larger text</strong> works better</li>
+                    <li>• <strong>High contrast</strong> (dark text on light background)</li>
+                    <li>• Select correct <strong>OCR language</strong> in settings</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="learn">
             <div className="glass-card rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-neon-green" />
-                  AI Corrected Text
-                  {isAiProcessing && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
-                </h3>
-                {correctedText && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => copyToClipboard(correctedText)}
-                    className="gap-2"
-                  >
-                    <Copy className="w-4 h-4" />
-                    Copy
-                  </Button>
-                )}
-              </div>
-              <div className="min-h-[100px] p-4 bg-card rounded-xl border border-border">
-                {correctedText ? (
-                  <p className="font-mono text-sm whitespace-pre-wrap">{correctedText}</p>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    {isAiProcessing
-                      ? "AI is correcting spelling and errors..."
-                      : "Corrected text will appear here"}
-                  </p>
-                )}
-              </div>
+              <ModelLearnContent type="ocr" />
             </div>
-
-            {/* Translation */}
-            <div className="glass-card rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Languages className="w-5 h-5 text-neon-purple" />
-                  Translation
-                  {isAiProcessing && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
-                </h3>
-                {translatedText && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => copyToClipboard(translatedText)}
-                    className="gap-2"
-                  >
-                    <Copy className="w-4 h-4" />
-                    Copy
-                  </Button>
-                )}
-              </div>
-
-              {/* Language selection */}
-              <div className="flex gap-2 mb-4 flex-wrap">
-                {languages.map((lang) => (
-                  <Button
-                    key={lang.code}
-                    variant={selectedLang === lang.code ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => changeLanguage(lang.code)}
-                    className="gap-2"
-                    disabled={isAiProcessing}
-                  >
-                    <span>{lang.flag}</span>
-                    <span className="hidden sm:inline">{lang.name}</span>
-                  </Button>
-                ))}
-              </div>
-
-              <div className="min-h-[120px] p-4 bg-card rounded-xl border border-border">
-                {translatedText ? (
-                  <p className="font-mono text-sm whitespace-pre-wrap">{translatedText}</p>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    {isAiProcessing 
-                      ? "AI is translating..." 
-                      : "Translation will appear here after text extraction"}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Tips */}
-            <div className="glass-card rounded-2xl p-6">
-              <h4 className="font-medium mb-3">Tips for best results:</h4>
-              <ul className="text-sm text-muted-foreground space-y-2">
-                <li>• Use <strong>printed text</strong> (typed, not handwritten)</li>
-                <li>• Ensure <strong>good lighting</strong> without glare</li>
-                <li>• Hold camera <strong>steady and straight</strong></li>
-                <li>• <strong>Larger text</strong> works better</li>
-                <li>• <strong>High contrast</strong> (dark text on light background)</li>
-                <li>• Select correct <strong>OCR language</strong> in settings</li>
-              </ul>
-            </div>
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
