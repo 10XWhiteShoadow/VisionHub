@@ -4,7 +4,9 @@ import { WebcamView, WebcamViewRef } from "@/components/WebcamView";
 import { StatsDisplay } from "@/components/StatsDisplay";
 import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
-import { Hand, Play, Pause, RefreshCw, Trophy, Scissors, Square, Circle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModelLearnContent } from "@/components/ModelLearnContent";
+import { Hand, Play, Pause, RefreshCw, Trophy, Scissors, Square, Circle, GraduationCap, Video } from "lucide-react";
 import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
 
 // Gesture recognition based on finger positions
@@ -399,202 +401,216 @@ export default function HandGesture() {
           </div>
         </div>
 
-        <StatsDisplay stats={stats} className="mb-6" />
+        {/* Tabs for Demo and Learn */}
+        <Tabs defaultValue="demo" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="demo" className="gap-2">
+              <Video className="w-4 h-4" />
+              Live Demo
+            </TabsTrigger>
+            <TabsTrigger value="learn" className="gap-2">
+              <GraduationCap className="w-4 h-4" />
+              Learn How It Works
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Webcam view */}
-          <div className="lg:col-span-2">
-            <div className="glass-card rounded-2xl p-4 relative">
-              <WebcamView
-                ref={webcamRef}
-                isProcessing={isRunning}
-                error={error}
-              >
-                <canvas
-                  ref={canvasRef}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  style={{ transform: "scaleX(-1)" }}
-                />
-              </WebcamView>
-              
-              {/* RPS Countdown overlay */}
-              {rpsCountdown !== null && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-2xl">
-                  <div className="text-center">
-                    <p className="text-9xl font-bold text-primary animate-pulse">{rpsCountdown}</p>
-                    <p className="text-xl text-muted-foreground mt-4">Show your hand!</p>
-                    {detectedRPS && (
-                      <p className="text-3xl mt-2">{rpsIcons[detectedRPS]} {detectedRPS.toUpperCase()}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <TabsContent value="demo" className="space-y-6">
+            <StatsDisplay stats={stats} />
 
-          {/* Game panel */}
-          <div className="glass-card rounded-2xl p-6">
-            {/* Game mode tabs */}
-            <div className="flex gap-2 mb-4">
-              <Button
-                variant={!rpsMode ? "default" : "outline"}
-                size="sm"
-                onClick={() => { setRpsMode(false); setGameActive(false); }}
-                className="flex-1 gap-2"
-              >
-                <Trophy className="w-4 h-4" />
-                Gesture
-              </Button>
-              <Button
-                variant={rpsMode ? "default" : "outline"}
-                size="sm"
-                onClick={startRPSGame}
-                className="flex-1 gap-2"
-              >
-                <Scissors className="w-4 h-4" />
-                RPS
-              </Button>
-            </div>
-
-            {!rpsMode ? (
-              // Gesture Game
-              <>
-                <div className="flex items-center gap-2 mb-4">
-                  <Trophy className="w-5 h-5 text-neon-orange" />
-                  <h3 className="text-lg font-semibold">Gesture Game</h3>
-                </div>
-                
-                {!gameActive ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground mb-6">
-                      Match the target gesture as fast as you can!
-                    </p>
-                    <Button variant="gradient" onClick={startGestureGame} className="gap-2">
-                      <Play className="w-4 h-4" />
-                      Start Game
-                    </Button>
-                    {score > 0 && (
-                      <p className="mt-4 text-lg">Last Score: <span className="text-primary font-bold">{score}</span></p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <div className="mb-4">
-                      <p className="text-muted-foreground text-sm">Time Left</p>
-                      <p className="text-4xl font-bold font-mono text-neon-orange">{timeLeft}s</p>
-                    </div>
-                    <div className="mb-4">
-                      <p className="text-muted-foreground text-sm">Show this gesture:</p>
-                      <p className="text-3xl mt-2">{targetGesture}</p>
-                    </div>
-                    <div className="p-4 bg-card rounded-xl">
-                      <p className="text-muted-foreground text-sm">Score</p>
-                      <p className="text-5xl font-bold text-primary">{score}</p>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              // Rock Paper Scissors Game
-              <>
-                <div className="flex items-center gap-2 mb-4">
-                  <Scissors className="w-5 h-5 text-neon-orange" />
-                  <h3 className="text-lg font-semibold">Rock Paper Scissors</h3>
-                </div>
-
-                {/* Score display */}
-                <div className="grid grid-cols-3 gap-2 mb-6 text-center">
-                  <div className="p-3 bg-card rounded-xl">
-                    <p className="text-xs text-muted-foreground">You</p>
-                    <p className="text-2xl font-bold text-neon-green">{rpsScore.player}</p>
-                  </div>
-                  <div className="p-3 bg-card rounded-xl">
-                    <p className="text-xs text-muted-foreground">VS</p>
-                    <p className="text-lg font-bold">⚔️</p>
-                  </div>
-                  <div className="p-3 bg-card rounded-xl">
-                    <p className="text-xs text-muted-foreground">CPU</p>
-                    <p className="text-2xl font-bold text-neon-orange">{rpsScore.computer}</p>
-                  </div>
-                </div>
-
-                {/* Result display */}
-                {rpsResult && (
-                  <div className={`text-center p-4 rounded-xl mb-4 ${
-                    rpsResult === "win" ? "bg-green-500/20" : 
-                    rpsResult === "lose" ? "bg-red-500/20" : "bg-yellow-500/20"
-                  }`}>
-                    <div className="flex justify-center gap-8 mb-2">
-                      <div>
-                        <p className="text-4xl">{playerChoice ? rpsIcons[playerChoice] : "❓"}</p>
-                        <p className="text-xs text-muted-foreground">You</p>
-                      </div>
-                      <div>
-                        <p className="text-4xl">{computerChoice ? rpsIcons[computerChoice] : "❓"}</p>
-                        <p className="text-xs text-muted-foreground">CPU</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Webcam view */}
+              <div className="lg:col-span-2">
+                <div className="glass-card rounded-2xl p-4 relative">
+                  <WebcamView
+                    ref={webcamRef}
+                    isProcessing={isRunning}
+                    error={error}
+                  >
+                    <canvas
+                      ref={canvasRef}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={{ transform: "scaleX(-1)" }}
+                    />
+                  </WebcamView>
+                  
+                  {/* RPS Countdown overlay */}
+                  {rpsCountdown !== null && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-2xl">
+                      <div className="text-center">
+                        <p className="text-9xl font-bold text-primary animate-pulse">{rpsCountdown}</p>
+                        <p className="text-xl text-muted-foreground mt-4">Show your hand!</p>
+                        {detectedRPS && (
+                          <p className="text-3xl mt-2">{rpsIcons[detectedRPS]} {detectedRPS.toUpperCase()}</p>
+                        )}
                       </div>
                     </div>
-                    <p className={`text-xl font-bold ${
-                      rpsResult === "win" ? "text-green-400" : 
-                      rpsResult === "lose" ? "text-red-400" : "text-yellow-400"
-                    }`}>
-                      {rpsResult === "win" ? "You Win! 🎉" : 
-                       rpsResult === "lose" ? "You Lose! 😢" : "Draw! 🤝"}
-                    </p>
-                  </div>
-                )}
-
-                {/* Detected gesture during countdown */}
-                {rpsCountdown === null && !rpsResult && detectedRPS && (
-                  <div className="text-center p-4 bg-card rounded-xl mb-4">
-                    <p className="text-sm text-muted-foreground">Detected:</p>
-                    <p className="text-3xl">{rpsIcons[detectedRPS]} {detectedRPS}</p>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Button 
-                    variant="gradient" 
-                    className="w-full gap-2"
-                    onClick={playRPSRound}
-                    disabled={rpsCountdown !== null}
-                  >
-                    <Play className="w-4 h-4" />
-                    {rpsResult ? "Play Again" : "Start Round (3s)"}
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={resetRPSScore}
-                  >
-                    Reset Score
-                  </Button>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-border">
-                  <p className="text-sm text-muted-foreground mb-2">How to play:</p>
-                  <ul className="text-xs text-muted-foreground space-y-1">
-                    <li>🪨 <strong>Rock</strong>: Make a fist</li>
-                    <li>📄 <strong>Paper</strong>: Open hand</li>
-                    <li>✂️ <strong>Scissors</strong>: Peace sign</li>
-                  </ul>
-                </div>
-              </>
-            )}
-            
-            {!rpsMode && (
-              <div className="mt-6 pt-4 border-t border-border">
-                <h4 className="text-sm font-medium mb-2">Available Gestures:</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-                  <span>✊ Fist</span>
-                  <span>☝️ Pointing</span>
-                  <span>✌️ Peace</span>
-                  <span>✋ Open Hand</span>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
-        </div>
+
+              {/* Game panel */}
+              <div className="glass-card rounded-2xl p-6">
+                {/* Game mode tabs */}
+                <div className="flex gap-2 mb-4">
+                  <Button
+                    variant={!rpsMode ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => { setRpsMode(false); setGameActive(false); }}
+                    className="flex-1 gap-2"
+                  >
+                    <Trophy className="w-4 h-4" />
+                    Gesture
+                  </Button>
+                  <Button
+                    variant={rpsMode ? "default" : "outline"}
+                    size="sm"
+                    onClick={startRPSGame}
+                    className="flex-1 gap-2"
+                  >
+                    <Scissors className="w-4 h-4" />
+                    RPS
+                  </Button>
+                </div>
+
+                {!rpsMode ? (
+                  // Gesture Game
+                  <>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Trophy className="w-5 h-5 text-neon-orange" />
+                      <h3 className="text-lg font-semibold">Gesture Game</h3>
+                    </div>
+                    
+                    {!gameActive ? (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground mb-6">
+                          Match the target gesture as fast as you can!
+                        </p>
+                        <Button variant="gradient" onClick={startGestureGame} className="gap-2">
+                          <Play className="w-4 h-4" />
+                          Start Game
+                        </Button>
+                        {score > 0 && (
+                          <p className="mt-4 text-lg">Last Score: <span className="text-primary font-bold">{score}</span></p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <div className="mb-4">
+                          <p className="text-muted-foreground text-sm">Time Left</p>
+                          <p className="text-4xl font-bold font-mono text-neon-orange">{timeLeft}s</p>
+                        </div>
+                        <div className="mb-4">
+                          <p className="text-muted-foreground text-sm">Show this gesture:</p>
+                          <p className="text-3xl mt-2">{targetGesture}</p>
+                        </div>
+                        <div className="p-4 bg-card rounded-xl">
+                          <p className="text-muted-foreground text-sm">Score</p>
+                          <p className="text-5xl font-bold text-primary">{score}</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // Rock Paper Scissors Game
+                  <>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Scissors className="w-5 h-5 text-neon-pink" />
+                      <h3 className="text-lg font-semibold">Rock Paper Scissors</h3>
+                    </div>
+
+                    {/* Score display */}
+                    <div className="flex justify-around text-center mb-6 p-4 bg-card rounded-xl">
+                      <div>
+                        <p className="text-sm text-muted-foreground">You</p>
+                        <p className="text-3xl font-bold text-neon-green">{rpsScore.player}</p>
+                      </div>
+                      <div className="text-muted-foreground flex items-center">VS</div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">AI</p>
+                        <p className="text-3xl font-bold text-neon-pink">{rpsScore.computer}</p>
+                      </div>
+                    </div>
+
+                    {/* Result display */}
+                    {rpsResult && (
+                      <div className={`text-center p-4 rounded-xl mb-4 ${
+                        rpsResult === "win" ? "bg-neon-green/20 border border-neon-green/30" :
+                        rpsResult === "lose" ? "bg-neon-pink/20 border border-neon-pink/30" :
+                        "bg-muted/30 border border-border"
+                      }`}>
+                        <div className="flex justify-around items-center mb-2">
+                          <div className="text-center">
+                            <p className="text-4xl">{playerChoice ? rpsIcons[playerChoice] : "❓"}</p>
+                            <p className="text-xs text-muted-foreground mt-1">You</p>
+                          </div>
+                          <p className="text-muted-foreground">vs</p>
+                          <div className="text-center">
+                            <p className="text-4xl">{computerChoice ? rpsIcons[computerChoice] : "❓"}</p>
+                            <p className="text-xs text-muted-foreground mt-1">AI</p>
+                          </div>
+                        </div>
+                        <p className={`text-lg font-bold ${
+                          rpsResult === "win" ? "text-neon-green" :
+                          rpsResult === "lose" ? "text-neon-pink" : ""
+                        }`}>
+                          {rpsResult === "win" ? "🎉 You Win!" :
+                           rpsResult === "lose" ? "😔 You Lose" : "🤝 Draw"}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="gradient" 
+                        onClick={playRPSRound} 
+                        disabled={rpsCountdown !== null}
+                        className="flex-1 gap-2"
+                      >
+                        <Play className="w-4 h-4" />
+                        {rpsResult ? "Play Again" : "Start Round"}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={resetRPSScore}
+                        className="gap-2"
+                      >
+                        <Square className="w-4 h-4" />
+                        Reset
+                      </Button>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <h4 className="text-sm font-medium mb-2">How to play:</h4>
+                      <ul className="text-xs text-muted-foreground space-y-1">
+                        <li>🪨 <strong>Rock</strong>: Make a fist</li>
+                        <li>📄 <strong>Paper</strong>: Open hand</li>
+                        <li>✂️ <strong>Scissors</strong>: Peace sign</li>
+                      </ul>
+                    </div>
+                  </>
+                )}
+                
+                {!rpsMode && (
+                  <div className="mt-6 pt-4 border-t border-border">
+                    <h4 className="text-sm font-medium mb-2">Available Gestures:</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                      <span>✊ Fist</span>
+                      <span>☝️ Pointing</span>
+                      <span>✌️ Peace</span>
+                      <span>✋ Open Hand</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="learn">
+            <div className="glass-card rounded-2xl p-6">
+              <ModelLearnContent type="hand" />
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );

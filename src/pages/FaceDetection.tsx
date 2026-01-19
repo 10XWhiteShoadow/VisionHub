@@ -4,7 +4,9 @@ import { WebcamView, WebcamViewRef } from "@/components/WebcamView";
 import { StatsDisplay } from "@/components/StatsDisplay";
 import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
-import { Scan, Play, Pause, RefreshCw } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModelLearnContent } from "@/components/ModelLearnContent";
+import { Scan, Play, Pause, RefreshCw, GraduationCap, Video } from "lucide-react";
 import * as faceapi from "@vladmandic/face-api";
 
 // Emotion labels
@@ -377,64 +379,82 @@ export default function FaceDetection() {
           </div>
         </div>
 
-        {/* Stats */}
-        <StatsDisplay stats={stats} className="mb-6" />
+        {/* Tabs for Demo and Learn */}
+        <Tabs defaultValue="demo" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="demo" className="gap-2">
+              <Video className="w-4 h-4" />
+              Live Demo
+            </TabsTrigger>
+            <TabsTrigger value="learn" className="gap-2">
+              <GraduationCap className="w-4 h-4" />
+              Learn How It Works
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Main content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Webcam view */}
-          <div className="lg:col-span-2">
-            <div className="glass-card rounded-2xl p-4">
-              <WebcamView
-                ref={webcamRef}
-                isProcessing={isRunning}
-                error={error}
-              >
-                <canvas
-                  ref={canvasRef}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  style={{ transform: "scaleX(-1)" }}
-                />
-              </WebcamView>
-            </div>
-          </div>
+          <TabsContent value="demo" className="space-y-6">
+            {/* Stats */}
+            <StatsDisplay stats={stats} />
 
-          {/* Info panel */}
-          <div className="glass-card rounded-2xl p-6">
-            <h3 className="text-lg font-semibold mb-4">How It Works</h3>
-            <div className="space-y-4 text-sm text-muted-foreground">
-              <p>
-                This demo uses <span className="text-primary font-medium">face-api.js</span> with 
-                deep learning models for accurate expression recognition.
-              </p>
-              <p>
-                Emotions are detected from <span className="text-neon-cyan font-medium">actual facial expressions</span> like 
-                smile, frown, raised eyebrows, etc.
-              </p>
-              <div className="pt-4 border-t border-border">
-                <h4 className="text-foreground font-medium mb-2">Detected Emotions:</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <span>😊 Happy</span>
-                  <span>😢 Sad</span>
-                  <span>😠 Angry</span>
-                  <span>😨 Fearful</span>
-                  <span>🤢 Disgusted</span>
-                  <span>😲 Surprised</span>
-                  <span>😐 Neutral</span>
+            {/* Main content */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Webcam view */}
+              <div className="lg:col-span-2">
+                <div className="glass-card rounded-2xl p-4">
+                  <WebcamView
+                    ref={webcamRef}
+                    isProcessing={isRunning}
+                    error={error}
+                  >
+                    <canvas
+                      ref={canvasRef}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={{ transform: "scaleX(-1)" }}
+                    />
+                  </WebcamView>
                 </div>
               </div>
-              <div className="pt-4 border-t border-border">
-                <h4 className="text-foreground font-medium mb-2">Features:</h4>
-                <ul className="space-y-1">
-                  <li>• Expression-based detection</li>
-                  <li>• Multi-face support</li>
-                  <li>• Real-time processing</li>
-                  <li>• Stabilized output</li>
-                </ul>
+
+              {/* Info panel */}
+              <div className="glass-card rounded-2xl p-6">
+                <h3 className="text-lg font-semibold mb-4">Quick Guide</h3>
+                <div className="space-y-4 text-sm text-muted-foreground">
+                  <p>
+                    This demo uses <span className="text-primary font-medium">face-api.js</span> with 
+                    deep learning models for accurate expression recognition.
+                  </p>
+                  <div className="pt-4 border-t border-border">
+                    <h4 className="text-foreground font-medium mb-2">Detected Emotions:</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <span>😊 Happy</span>
+                      <span>😢 Sad</span>
+                      <span>😠 Angry</span>
+                      <span>😨 Fearful</span>
+                      <span>🤢 Disgusted</span>
+                      <span>😲 Surprised</span>
+                      <span>😐 Neutral</span>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-border">
+                    <h4 className="text-foreground font-medium mb-2">Features:</h4>
+                    <ul className="space-y-1">
+                      <li>• Expression-based detection</li>
+                      <li>• Multi-face support</li>
+                      <li>• Real-time processing</li>
+                      <li>• Stabilized output</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </TabsContent>
+
+          <TabsContent value="learn">
+            <div className="glass-card rounded-2xl p-6">
+              <ModelLearnContent type="face" />
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );

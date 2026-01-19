@@ -4,7 +4,9 @@ import { WebcamView, WebcamViewRef } from "@/components/WebcamView";
 import { StatsDisplay } from "@/components/StatsDisplay";
 import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
-import { Activity, Play, Pause, RefreshCw, Dumbbell, RotateCcw } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModelLearnContent } from "@/components/ModelLearnContent";
+import { Activity, Play, Pause, RefreshCw, Dumbbell, RotateCcw, GraduationCap, Video } from "lucide-react";
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 
 // Pose landmark indices
@@ -444,100 +446,122 @@ export default function PoseEstimation() {
           </div>
         </div>
 
-        <StatsDisplay stats={stats} className="mb-6" />
+        {/* Tabs for Demo and Learn */}
+        <Tabs defaultValue="demo" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="demo" className="gap-2">
+              <Video className="w-4 h-4" />
+              Live Demo
+            </TabsTrigger>
+            <TabsTrigger value="learn" className="gap-2">
+              <GraduationCap className="w-4 h-4" />
+              Learn How It Works
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Webcam view */}
-          <div className="lg:col-span-2">
-            <div className="glass-card rounded-2xl p-4">
-              <WebcamView
-                ref={webcamRef}
-                isProcessing={isRunning}
-                error={error}
-              >
-                <canvas
-                  ref={canvasRef}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  style={{ transform: "scaleX(-1)" }}
-                />
-              </WebcamView>
-            </div>
-          </div>
+          <TabsContent value="demo" className="space-y-6">
+            <StatsDisplay stats={stats} />
 
-          {/* Exercise panel */}
-          <div className="glass-card rounded-2xl p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Dumbbell className="w-5 h-5 text-neon-orange" />
-              <h3 className="text-lg font-semibold">Exercise Counter</h3>
-            </div>
-            
-            {/* Rep counter display */}
-            <div className="text-center p-6 bg-card rounded-xl mb-6">
-              <p className="text-muted-foreground text-sm mb-2">Repetitions</p>
-              <p className="text-7xl font-bold font-mono text-neon-green">{repCount}</p>
-              {exercise !== "none" && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  {isDown ? "Down position ⬇️" : "Up position ⬆️"}
-                </p>
-              )}
-            </div>
-
-            {/* Exercise selection */}
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              <p className="text-sm font-medium sticky top-0 bg-card py-1">Select Exercise:</p>
-              {(Object.keys(exercises) as Exclude<ExerciseType, "none">[]).map((ex) => {
-                const config = exercises[ex];
-                return (
-                  <Button
-                    key={ex}
-                    variant={exercise === ex ? "gradient" : "outline"}
-                    className="w-full justify-start gap-3"
-                    onClick={() => selectExercise(ex)}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Webcam view */}
+              <div className="lg:col-span-2">
+                <div className="glass-card rounded-2xl p-4">
+                  <WebcamView
+                    ref={webcamRef}
+                    isProcessing={isRunning}
+                    error={error}
                   >
-                    <span className="text-xl">{config.emoji}</span>
-                    <div className="text-left">
-                      <span className="block">{config.name}</span>
-                      <span className="text-xs text-muted-foreground">{config.description}</span>
-                    </div>
-                  </Button>
-                );
-              })}
-            </div>
-
-            {exercise !== "none" && (
-              <Button
-                variant="outline"
-                className="w-full mt-4 gap-2"
-                onClick={resetCounter}
-              >
-                <RotateCcw className="w-4 h-4" />
-                Reset Counter
-              </Button>
-            )}
-
-            {/* Exercise tips */}
-            {exercise !== "none" && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <h4 className="text-sm font-medium mb-2">Tips for {exercises[exercise].name}:</h4>
-                <ul className="text-xs text-muted-foreground space-y-1">
-                  {exercises[exercise].tips.map((tip, i) => (
-                    <li key={i}>• {tip}</li>
-                  ))}
-                </ul>
+                    <canvas
+                      ref={canvasRef}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={{ transform: "scaleX(-1)" }}
+                    />
+                  </WebcamView>
+                </div>
               </div>
-            )}
 
-            <div className="mt-4 pt-4 border-t border-border">
-              <h4 className="text-sm font-medium mb-2">General Tips:</h4>
-              <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Stand sideways to camera for best results</li>
-                <li>• Ensure full body is visible</li>
-                <li>• Move at a steady pace</li>
-                <li>• Good lighting improves accuracy</li>
-              </ul>
+              {/* Exercise panel */}
+              <div className="glass-card rounded-2xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Dumbbell className="w-5 h-5 text-neon-orange" />
+                  <h3 className="text-lg font-semibold">Exercise Counter</h3>
+                </div>
+                
+                {/* Rep counter display */}
+                <div className="text-center p-6 bg-card rounded-xl mb-6">
+                  <p className="text-muted-foreground text-sm mb-2">Repetitions</p>
+                  <p className="text-7xl font-bold font-mono text-neon-green">{repCount}</p>
+                  {exercise !== "none" && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {isDown ? "Down position ⬇️" : "Up position ⬆️"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Exercise selection */}
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  <p className="text-sm font-medium sticky top-0 bg-card py-1">Select Exercise:</p>
+                  {(Object.keys(exercises) as Exclude<ExerciseType, "none">[]).map((ex) => {
+                    const config = exercises[ex];
+                    return (
+                      <Button
+                        key={ex}
+                        variant={exercise === ex ? "gradient" : "outline"}
+                        className="w-full justify-start gap-3"
+                        onClick={() => selectExercise(ex)}
+                      >
+                        <span className="text-xl">{config.emoji}</span>
+                        <div className="text-left">
+                          <span className="block">{config.name}</span>
+                          <span className="text-xs text-muted-foreground">{config.description}</span>
+                        </div>
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                {exercise !== "none" && (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-4 gap-2"
+                    onClick={resetCounter}
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reset Counter
+                  </Button>
+                )}
+
+                {/* Exercise tips */}
+                {exercise !== "none" && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <h4 className="text-sm font-medium mb-2">Tips for {exercises[exercise].name}:</h4>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      {exercises[exercise].tips.map((tip, i) => (
+                        <li key={i}>• {tip}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="mt-4 pt-4 border-t border-border">
+                  <h4 className="text-sm font-medium mb-2">General Tips:</h4>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    <li>• Stand sideways to camera for best results</li>
+                    <li>• Ensure full body is visible</li>
+                    <li>• Move at a steady pace</li>
+                    <li>• Good lighting improves accuracy</li>
+                  </ul>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </TabsContent>
+
+          <TabsContent value="learn">
+            <div className="glass-card rounded-2xl p-6">
+              <ModelLearnContent type="pose" />
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
