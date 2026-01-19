@@ -556,3 +556,93 @@
     }
   }
 }
+
+/* Print Styles for PDF Export */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  .print\:hidden {
+    display: none !important;
+  }
+  
+  header, footer, nav {
+    display: none !important;
+  }
+  
+  .bg-hero-gradient,
+  .grid-pattern,
+  .animate-float,
+  .particles {
+    display: none !important;
+  }
+  
+  .backdrop-blur,
+  .backdrop-blur-sm,
+  .backdrop-blur-lg,
+  .backdrop-blur-xl {
+    backdrop-filter: none !important;
+  }
+  
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  .min-h-screen {
+    min-height: auto !important;
+  }
+  
+  section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  
+  h1, h2, h3 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  
+  .text-gradient-animate,
+  .text-gradient {
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    background-clip: unset !important;
+    -webkit-text-fill-color: black !important;
+    color: black !important;
+  }
+  
+  .bg-card\/30,
+  .bg-card\/50,
+  .bg-muted\/20,
+  .bg-muted\/50 {
+    background-color: #f5f5f5 !important;
+  }
+  
+  .border-border\/30,
+  .border-border\/50 {
+    border-color: #ddd !important;
+  }
+  
+  .text-muted-foreground {
+    color: #555 !important;
+  }
+  
+  .text-primary {
+    color: #0066cc !important;
+  }
+  
+  .rounded-2xl,
+  .rounded-xl {
+    border-radius: 8px !important;
+  }
+  
+  @page {
+    margin: 1.5cm;
+    size: A4;
+  }
+}
