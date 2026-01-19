@@ -10,6 +10,7 @@ import Webcam from "react-webcam";
 import { useStudents, Student } from "@/hooks/useStudents";
 import { useAttendance } from "@/hooks/useAttendance";
 import { useAuth } from "@/hooks/useAuth";
+import { useVoiceAnnouncement } from "@/hooks/useVoiceAnnouncement";
 import {
   FaceDetector,
   FilesetResolver,
@@ -21,14 +22,16 @@ import {
   Clock, 
   CheckCircle2, 
   XCircle,
-  Send,
   Loader2,
   UserPlus,
-  Sparkles,
   Download,
   Save,
   Scan,
   Zap,
+  Volume2,
+  VolumeX,
+  UserMinus,
+  Cloud,
 } from "lucide-react";
 
 interface FaceMatch {
@@ -59,9 +62,13 @@ const Attendance = () => {
     loading: attendanceLoading,
     saving,
     markPresent: markPresentInDb,
+    removePresent: removePresentFromDb,
     exportToCSV,
     fetchAllAttendance,
+    syncToGoogleSheets,
   } = useAttendance();
+  
+  const { isEnabled: voiceEnabled, announce, toggle: toggleVoice } = useVoiceAnnouncement();
   
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [faceDetector, setFaceDetector] = useState<FaceDetector | null>(null);
@@ -72,6 +79,7 @@ const Attendance = () => {
   const [currentMatch, setCurrentMatch] = useState<FaceMatch | null>(null);
   const [isMatching, setIsMatching] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // Refs for stabilization
   const lastMarkTimeRef = useRef<Record<string, number>>({});
@@ -296,12 +304,15 @@ const Attendance = () => {
       setLastDetection(match.student.name);
       matchHistoryRef.current = [];
       
+      // Announce the student's name
+      announce(match.student.name);
+      
       toast({
         title: "✓ Auto-Marked Present",
         description: `${match.student.name} recognized and saved`,
       });
     }
-  }, [todayAttendance, toast, markPresentInDb]);
+  }, [todayAttendance, toast, markPresentInDb, announce]);
 
   // Process video frame for face detection and matching
   const processFrame = useCallback(async () => {
@@ -452,11 +463,35 @@ const Attendance = () => {
       setLastDetection(student.name);
       lastMarkTimeRef.current[student.id] = Date.now();
       
+      // Announce the student's name
+      announce(student.name);
+      
       toast({
         title: "Attendance Marked! ✓",
         description: `${student.name} marked present and saved`,
       });
     }
+  };
+
+  // Remove from present
+  const removePresent = async (studentId: string, studentName: string) => {
+    const record = todayAttendance.find((r) => r.studentId === studentId);
+    if (!record) return;
+
+    const success = await removePresentFromDb(record.id);
+    if (success) {
+      toast({
+        title: "Removed",
+        description: `${studentName} removed from present list`,
+      });
+    }
+  };
+
+  // Sync to Google Sheets
+  const handleSyncToSheets = async () => {
+    setIsSyncing(true);
+    await syncToGoogleSheets();
+    setIsSyncing(false);
   };
 
   // Export all attendance records
@@ -578,29 +613,62 @@ const Attendance = () => {
                 </div>
               </Card>
 
-              {/* Auto Mode Toggle */}
-              <Card className="glass-card p-4 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-neon-purple/10 flex items-center justify-center">
-                      <Zap className="w-5 h-5 text-neon-purple" />
+              {/* Controls */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Auto Mode Toggle */}
+                <Card className="glass-card p-4 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-neon-purple/10 flex items-center justify-center">
+                        <Zap className="w-5 h-5 text-neon-purple" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Auto Recognition</p>
+                        <p className="text-xs text-muted-foreground">
+                          Auto-mark when recognized
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Auto Recognition</p>
-                      <p className="text-sm text-muted-foreground">
-                        Automatically mark attendance when faces are recognized
-                      </p>
-                    </div>
+                    <Button
+                      size="sm"
+                      variant={autoMode ? "default" : "outline"}
+                      onClick={() => setAutoMode(!autoMode)}
+                      className={autoMode ? "bg-neon-green hover:bg-neon-green/80" : ""}
+                    >
+                      {autoMode ? "ON" : "OFF"}
+                    </Button>
                   </div>
-                  <Button
-                    variant={autoMode ? "default" : "outline"}
-                    onClick={() => setAutoMode(!autoMode)}
-                    className={autoMode ? "bg-neon-green hover:bg-neon-green/80" : ""}
-                  >
-                    {autoMode ? "ON" : "OFF"}
-                  </Button>
-                </div>
-              </Card>
+                </Card>
+
+                {/* Voice Announcement Toggle */}
+                <Card className="glass-card p-4 animate-fade-in-up" style={{ animationDelay: "0.15s" }}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-neon-cyan/10 flex items-center justify-center">
+                        {voiceEnabled ? (
+                          <Volume2 className="w-5 h-5 text-neon-cyan" />
+                        ) : (
+                          <VolumeX className="w-5 h-5 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Voice Announce</p>
+                        <p className="text-xs text-muted-foreground">
+                          Speak student names
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={voiceEnabled ? "default" : "outline"}
+                      onClick={toggleVoice}
+                      className={voiceEnabled ? "bg-neon-cyan hover:bg-neon-cyan/80" : ""}
+                    >
+                      {voiceEnabled ? "ON" : "OFF"}
+                    </Button>
+                  </div>
+                </Card>
+              </div>
             </div>
 
             {/* Attendance Panel */}
@@ -688,9 +756,20 @@ const Attendance = () => {
                             </div>
                           </div>
                           {isPresent ? (
-                            <div className="flex items-center gap-2 text-neon-green">
-                              <CheckCircle2 className="w-5 h-5" />
-                              <span className="text-sm font-medium">Present</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-neon-green flex items-center gap-1">
+                                <CheckCircle2 className="w-4 h-4" />
+                                Present
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => removePresent(student.id, student.name)}
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-neon-pink hover:bg-neon-pink/10"
+                                title="Remove from present"
+                              >
+                                <UserMinus className="w-4 h-4" />
+                              </Button>
                             </div>
                           ) : (
                             <Button
@@ -710,28 +789,41 @@ const Attendance = () => {
                 )}
               </Card>
 
-              {/* Export Buttons */}
-              <div className="flex gap-2">
+              {/* Action Buttons */}
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   onClick={handleExportToday}
                   disabled={todayAttendance.length === 0}
                   variant="outline"
-                  className="flex-1 gap-2 hover:border-neon-cyan/50"
+                  className="gap-2 hover:border-neon-cyan/50"
                 >
                   <Download className="w-4 h-4" />
-                  Export Today
+                  Today
                 </Button>
                 <Button
                   onClick={handleExportAll}
                   disabled={isExporting}
-                  className="flex-1 gap-2 bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90"
+                  variant="outline"
+                  className="gap-2 hover:border-neon-purple/50"
                 >
                   {isExporting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <Save className="w-4 h-4" />
                   )}
-                  Export All
+                  All
+                </Button>
+                <Button
+                  onClick={handleSyncToSheets}
+                  disabled={isSyncing || todayAttendance.length === 0}
+                  className="gap-2 bg-gradient-to-r from-neon-green to-neon-cyan hover:opacity-90"
+                >
+                  {isSyncing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Cloud className="w-4 h-4" />
+                  )}
+                  Sync
                 </Button>
               </div>
             </div>
