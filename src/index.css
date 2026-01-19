@@ -559,11 +559,16 @@
 
 /* Print Styles for PDF Export */
 @media print {
-  body {
-    background: white !important;
-    color: black !important;
+  * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  
+  body {
+    background: white !important;
+    color: #1a1a1a !important;
+    font-size: 12pt !important;
   }
   
   .print\:hidden {
@@ -605,40 +610,86 @@
   h1, h2, h3 {
     page-break-after: avoid;
     break-after: avoid;
+    color: #1a1a1a !important;
+    -webkit-text-fill-color: #1a1a1a !important;
+  }
+  
+  h1 {
+    font-size: 24pt !important;
+  }
+  
+  h2 {
+    font-size: 18pt !important;
+  }
+  
+  h3 {
+    font-size: 14pt !important;
+  }
+  
+  p, span, li, div {
+    color: #333 !important;
+    -webkit-text-fill-color: #333 !important;
   }
   
   .text-gradient-animate,
-  .text-gradient {
+  .text-gradient,
+  .gradient-text-cyber,
+  .gradient-text-sunset {
     background: none !important;
     -webkit-background-clip: unset !important;
     background-clip: unset !important;
-    -webkit-text-fill-color: black !important;
-    color: black !important;
+    -webkit-text-fill-color: #1a1a1a !important;
+    color: #1a1a1a !important;
   }
   
   .bg-card\/30,
   .bg-card\/50,
   .bg-muted\/20,
-  .bg-muted\/50 {
-    background-color: #f5f5f5 !important;
+  .bg-muted\/50,
+  .bg-card,
+  .glass-card {
+    background-color: #f8f8f8 !important;
+    border: 1px solid #ddd !important;
   }
   
   .border-border\/30,
   .border-border\/50 {
-    border-color: #ddd !important;
+    border-color: #ccc !important;
   }
   
   .text-muted-foreground {
     color: #555 !important;
+    -webkit-text-fill-color: #555 !important;
   }
   
   .text-primary {
     color: #0066cc !important;
+    -webkit-text-fill-color: #0066cc !important;
+  }
+  
+  .text-foreground,
+  .text-white {
+    color: #1a1a1a !important;
+    -webkit-text-fill-color: #1a1a1a !important;
+  }
+  
+  .text-cyan-400,
+  .text-purple-400,
+  .text-emerald-400,
+  .text-orange-400 {
+    color: #0066cc !important;
+    -webkit-text-fill-color: #0066cc !important;
   }
   
   .rounded-2xl,
   .rounded-xl {
     border-radius: 8px !important;
+  }
+  
+  /* Ensure SVG icons are visible */
+  svg {
+    color: #333 !important;
+    fill: currentColor !important;
   }
   
   @page {
