@@ -20,7 +20,7 @@
 
 ## 🌐 Live Demo
 
-**Visit the platform:** [https://vsionhub.lovable.app](https://vsionhub.lovable.app)
+**Visit the platform:** [https://vision-hub-kappa.vercel.app/](https://vision-hub-kappa.vercel.app/)
 
 ---
 
