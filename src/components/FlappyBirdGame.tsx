@@ -216,21 +216,38 @@ export function FlappyBirdGame({ faceY, isTracking }: FlappyBirdGameProps) {
     return false;
   }, []);
 
-  // Game loop
+  // Store previous faceY for interpolation
+  const prevFaceYRef = useRef<number | null>(null);
+  const lastGameLoopTimeRef = useRef<number>(0);
+  
+  // Game loop with frame rate limiting
   const gameLoop = useCallback((timestamp: number) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     
+    // Limit game loop to ~60 FPS
+    const deltaTime = timestamp - lastGameLoopTimeRef.current;
+    if (deltaTime < 16) { // ~60 FPS
+      gameRef.current.animationId = requestAnimationFrame(gameLoop);
+      return;
+    }
+    lastGameLoopTimeRef.current = timestamp;
+    
     const game = gameRef.current;
     
-    // Update bird position based on face Y
+    // Update bird position based on face Y with interpolation
     if (faceY !== null && isTracking) {
-      // Map face Y (0-1) to canvas Y with faster response
-      // Invert: face up (low Y) = bird up, face down (high Y) = bird down
-      const targetY = faceY * (CANVAS_HEIGHT - 100) + 50;
-      // Increased smoothing factor for more responsive control
-      game.birdY += (targetY - game.birdY) * 0.25;
+      // Interpolate between previous and current faceY for smoother movement
+      const currentFaceY = prevFaceYRef.current !== null 
+        ? prevFaceYRef.current + (faceY - prevFaceYRef.current) * 0.5
+        : faceY;
+      prevFaceYRef.current = faceY;
+      
+      // Map face Y (0-1) to canvas Y
+      const targetY = currentFaceY * (CANVAS_HEIGHT - 100) + 50;
+      // Smooth movement
+      game.birdY += (targetY - game.birdY) * 0.3;
     }
     
     // Spawn pipes

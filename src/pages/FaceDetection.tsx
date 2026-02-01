@@ -152,6 +152,11 @@ export default function FaceDetection() {
       .sort(([, a], [, b]) => b - a)[0]?.[0] || 0);
   }, []);
 
+  // Throttle detection to reduce CPU load
+  const lastDetectionTimeRef = useRef<number>(0);
+  const DETECTION_INTERVAL = 100; // Only run detection every 100ms (10 FPS)
+  const cachedDetectionsRef = useRef<faceapi.WithFaceExpressions<faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }, faceapi.FaceLandmarks68>>[]>([]);
+
   // Process frame for face detection with expressions
   const processFrame = useCallback(async () => {
     const video = webcamRef.current?.getVideo();
@@ -178,12 +183,20 @@ export default function FaceDetection() {
 
     try {
       const startTime = performance.now();
+      const timeSinceLastDetection = startTime - lastDetectionTimeRef.current;
       
-      // Detect faces with expressions
-      const detections = await faceapi
-        .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
-        .withFaceLandmarks()
-        .withFaceExpressions();
+      // Only run expensive detection at throttled interval
+      let detections = cachedDetectionsRef.current;
+      if (timeSinceLastDetection >= DETECTION_INTERVAL) {
+        // Run detection with smaller input size for better performance
+        detections = await faceapi
+          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 }))
+          .withFaceLandmarks()
+          .withFaceExpressions();
+        
+        cachedDetectionsRef.current = detections;
+        lastDetectionTimeRef.current = startTime;
+      }
       
       // Calculate FPS
       frameCountRef.current++;
