@@ -244,6 +244,73 @@ export default function FaceDetection() {
 
         ctx.shadowBlur = 0;
 
+        // Draw face landmark points
+        const landmarks = detection.landmarks;
+        if (landmarks) {
+          const positions = landmarks.positions;
+          
+          // Draw all 68 landmark points
+          ctx.fillStyle = "hsl(330, 90%, 60%)"; // neon pink
+          positions.forEach((point, pointIndex) => {
+            // Calculate smoothed position relative to face box
+            const pointX = smoothX + (point.x - box.x);
+            const pointY = smoothY + (point.y - box.y);
+            
+            ctx.beginPath();
+            ctx.arc(pointX, pointY, 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Highlight key features with larger dots
+            // Eyes: 36-41 (left), 42-47 (right)
+            // Nose: 27-35
+            // Mouth: 48-67
+            if ([36, 39, 42, 45, 30, 48, 54].includes(pointIndex)) {
+              ctx.fillStyle = "hsl(187, 100%, 50%)"; // cyan for key points
+              ctx.beginPath();
+              ctx.arc(pointX, pointY, 4, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.fillStyle = "hsl(330, 90%, 60%)";
+            }
+          });
+          
+          // Draw connections for facial features (optional enhancement)
+          ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
+          ctx.lineWidth = 1;
+          
+          // Jaw line (0-16)
+          ctx.beginPath();
+          for (let i = 0; i <= 16; i++) {
+            const pt = positions[i];
+            const px = smoothX + (pt.x - box.x);
+            const py = smoothY + (pt.y - box.y);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+          
+          // Left eyebrow (17-21)
+          ctx.beginPath();
+          for (let i = 17; i <= 21; i++) {
+            const pt = positions[i];
+            const px = smoothX + (pt.x - box.x);
+            const py = smoothY + (pt.y - box.y);
+            if (i === 17) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+          
+          // Right eyebrow (22-26)
+          ctx.beginPath();
+          for (let i = 22; i <= 26; i++) {
+            const pt = positions[i];
+            const px = smoothX + (pt.x - box.x);
+            const py = smoothY + (pt.y - box.y);
+            if (i === 22) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        }
+
         // Get emotion emoji
         const emotionEmojis: Record<Emotion, string> = {
           Happy: "😊",
