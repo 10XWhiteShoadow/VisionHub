@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, RotateCcw, Trophy } from "lucide-react";
+import { Play, RotateCcw, Trophy, Volume2, VolumeX, Music, Music2 } from "lucide-react";
+import { gameAudio } from "@/lib/gameAudio";
 
 interface Pipe {
   x: number;
@@ -30,6 +31,9 @@ export function FlappyBirdGame({ faceY, isTracking }: FlappyBirdGameProps) {
   const [gameState, setGameState] = useState<"idle" | "playing" | "gameover">("idle");
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [sfxEnabled, setSfxEnabled] = useState(true);
+  const lastScoreRef = useRef(0);
   
   const gameRef = useRef({
     birdY: CANVAS_HEIGHT / 2,
@@ -250,6 +254,12 @@ export function FlappyBirdGame({ faceY, isTracking }: FlappyBirdGameProps) {
         pipe.passed = true;
         game.score++;
         setScore(game.score);
+        
+        // Play score sound
+        if (game.score > lastScoreRef.current) {
+          gameAudio.playScore();
+          lastScoreRef.current = game.score;
+        }
       }
       
       return pipe.x > -PIPE_WIDTH;
@@ -257,6 +267,8 @@ export function FlappyBirdGame({ faceY, isTracking }: FlappyBirdGameProps) {
     
     // Check collision
     if (checkCollision(game.birdY, game.pipes)) {
+      gameAudio.playGameOver();
+      gameAudio.stopMusic();
       setGameState("gameover");
       if (game.score > highScore) {
         setHighScore(game.score);
@@ -301,9 +313,16 @@ export function FlappyBirdGame({ faceY, isTracking }: FlappyBirdGameProps) {
     game.pipes = [];
     game.score = 0;
     game.lastPipeSpawn = 0;
+    lastScoreRef.current = 0;
     setScore(0);
     setGameState("playing");
-  }, []);
+    
+    // Play start sound and music
+    gameAudio.playStart();
+    if (musicEnabled) {
+      setTimeout(() => gameAudio.startMusic(), 500);
+    }
+  }, [musicEnabled]);
 
   // Game state management
   useEffect(() => {
@@ -315,6 +334,8 @@ export function FlappyBirdGame({ faceY, isTracking }: FlappyBirdGameProps) {
       if (gameRef.current.animationId) {
         cancelAnimationFrame(gameRef.current.animationId);
       }
+      // Stop music when game stops
+      gameAudio.stopMusic();
     };
   }, [gameState, gameLoop]);
 
@@ -372,6 +393,34 @@ export function FlappyBirdGame({ faceY, isTracking }: FlappyBirdGameProps) {
 
   return (
     <div className="flex flex-col items-center gap-4">
+      {/* Audio controls */}
+      <div className="flex items-center gap-2">
+        <Button
+          variant={musicEnabled ? "neon-green" : "outline"}
+          size="sm"
+          onClick={() => {
+            const enabled = gameAudio.toggleMusic();
+            setMusicEnabled(enabled);
+          }}
+          className="gap-1.5"
+        >
+          {musicEnabled ? <Music className="w-4 h-4" /> : <Music2 className="w-4 h-4" />}
+          Music
+        </Button>
+        <Button
+          variant={sfxEnabled ? "neon-green" : "outline"}
+          size="sm"
+          onClick={() => {
+            const enabled = gameAudio.toggleSfx();
+            setSfxEnabled(enabled);
+          }}
+          className="gap-1.5"
+        >
+          {sfxEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          SFX
+        </Button>
+      </div>
+      
       <canvas
         ref={canvasRef}
         width={CANVAS_WIDTH}
@@ -391,7 +440,7 @@ export function FlappyBirdGame({ faceY, isTracking }: FlappyBirdGameProps) {
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <Trophy className="w-3 h-3" /> Best
                 </p>
-                <p className="text-2xl font-bold text-yellow-500">{highScore}</p>
+                <p className="text-2xl font-bold text-accent-foreground">{highScore}</p>
               </div>
             )}
           </div>
