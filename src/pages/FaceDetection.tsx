@@ -6,7 +6,8 @@ import { LoadingState } from "@/components/LoadingState";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModelLearnContent } from "@/components/ModelLearnContent";
-import { Scan, Play, Pause, RefreshCw, GraduationCap, Video } from "lucide-react";
+import { FlappyBirdGame } from "@/components/FlappyBirdGame";
+import { Scan, Play, Pause, RefreshCw, GraduationCap, Video, Gamepad2 } from "lucide-react";
 import * as faceapi from "@vladmandic/face-api";
 
 // Emotion labels
@@ -26,6 +27,8 @@ export default function FaceDetection() {
   const [currentEmotion, setCurrentEmotion] = useState<Emotion>("Neutral");
   const [fps, setFps] = useState(0);
   const [confidence, setConfidence] = useState(0);
+  const [faceYPosition, setFaceYPosition] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState("demo");
   
   const webcamRef = useRef<WebcamViewRef>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -206,6 +209,12 @@ export default function FaceDetection() {
         if (index === 0) {
           setCurrentEmotion(stableEmotion);
           setConfidence(Math.round(emotionConfidence * 100));
+          
+          // Calculate normalized face Y position for game (0 = top, 1 = bottom)
+          const videoHeight = video.videoHeight || 480;
+          const faceCenterY = box.y + box.height / 2;
+          const normalizedY = Math.max(0, Math.min(1, faceCenterY / videoHeight));
+          setFaceYPosition(normalizedY);
         }
 
         // Smooth box position to reduce jitter
@@ -379,16 +388,20 @@ export default function FaceDetection() {
           </div>
         </div>
 
-        {/* Tabs for Demo and Learn */}
-        <Tabs defaultValue="demo" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+        {/* Tabs for Demo, Game and Learn */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="demo" className="gap-2">
               <Video className="w-4 h-4" />
               Live Demo
             </TabsTrigger>
+            <TabsTrigger value="game" className="gap-2">
+              <Gamepad2 className="w-4 h-4" />
+              Flappy Face
+            </TabsTrigger>
             <TabsTrigger value="learn" className="gap-2">
               <GraduationCap className="w-4 h-4" />
-              Learn How It Works
+              Learn
             </TabsTrigger>
           </TabsList>
 
@@ -445,6 +458,54 @@ export default function FaceDetection() {
                     </ul>
                   </div>
                 </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="game" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Webcam for face tracking */}
+              <div className="glass-card rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-neon-cyan/20 flex items-center justify-center">
+                    <Scan className="w-4 h-4 text-neon-cyan" />
+                  </div>
+                  <h3 className="font-semibold">Face Tracking</h3>
+                  {faceCount > 0 && (
+                    <span className="ml-auto text-xs px-2 py-1 rounded-full bg-neon-green/20 text-neon-green">
+                      ● Tracking
+                    </span>
+                  )}
+                </div>
+                <WebcamView
+                  ref={webcamRef}
+                  isProcessing={isRunning}
+                  error={error}
+                  className="aspect-[4/3]"
+                >
+                  <canvas
+                    ref={canvasRef}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{ transform: "scaleX(-1)" }}
+                  />
+                </WebcamView>
+                <p className="text-xs text-muted-foreground mt-3 text-center">
+                  Move your face UP/DOWN to control the bird
+                </p>
+              </div>
+
+              {/* Flappy Bird Game */}
+              <div className="glass-card rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-neon-pink/20 flex items-center justify-center">
+                    <Gamepad2 className="w-4 h-4 text-neon-pink" />
+                  </div>
+                  <h3 className="font-semibold">Flappy Face Game</h3>
+                </div>
+                <FlappyBirdGame 
+                  faceY={faceYPosition} 
+                  isTracking={faceCount > 0 && isRunning} 
+                />
               </div>
             </div>
           </TabsContent>
