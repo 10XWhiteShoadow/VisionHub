@@ -226,9 +226,11 @@ export function FlappyBirdGame({ faceY, isTracking }: FlappyBirdGameProps) {
     
     // Update bird position based on face Y
     if (faceY !== null && isTracking) {
-      // Map face Y (0-1) to canvas Y with smoothing
-      const targetY = faceY * (CANVAS_HEIGHT - 80) + 40;
-      game.birdY += (targetY - game.birdY) * 0.15;
+      // Map face Y (0-1) to canvas Y with faster response
+      // Invert: face up (low Y) = bird up, face down (high Y) = bird down
+      const targetY = faceY * (CANVAS_HEIGHT - 100) + 50;
+      // Increased smoothing factor for more responsive control
+      game.birdY += (targetY - game.birdY) * 0.25;
     }
     
     // Spawn pipes
@@ -290,6 +292,36 @@ export function FlappyBirdGame({ faceY, isTracking }: FlappyBirdGameProps) {
     ctx.textAlign = "center";
     ctx.strokeText(game.score.toString(), CANVAS_WIDTH / 2, 50);
     ctx.fillText(game.score.toString(), CANVAS_WIDTH / 2, 50);
+    
+    // Draw face Y indicator on the left side
+    if (faceY !== null && isTracking) {
+      const indicatorY = faceY * (CANVAS_HEIGHT - 100) + 50;
+      
+      // Indicator line
+      ctx.strokeStyle = "rgba(0, 255, 255, 0.5)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(0, indicatorY);
+      ctx.lineTo(60, indicatorY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Indicator dot
+      ctx.fillStyle = "hsl(187, 100%, 50%)";
+      ctx.beginPath();
+      ctx.arc(15, indicatorY, 8, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Small arrow pointing to bird
+      ctx.fillStyle = "rgba(0, 255, 255, 0.7)";
+      ctx.beginPath();
+      ctx.moveTo(60, indicatorY);
+      ctx.lineTo(50, indicatorY - 5);
+      ctx.lineTo(50, indicatorY + 5);
+      ctx.closePath();
+      ctx.fill();
+    }
     
     // Face tracking indicator
     if (!isTracking || faceY === null) {
