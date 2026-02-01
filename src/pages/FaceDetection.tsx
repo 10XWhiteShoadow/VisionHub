@@ -154,8 +154,9 @@ export default function FaceDetection() {
 
   // Throttle detection to reduce CPU load
   const lastDetectionTimeRef = useRef<number>(0);
-  const DETECTION_INTERVAL = 100; // Only run detection every 100ms (10 FPS)
+  const DETECTION_INTERVAL = 50; // Run detection every 50ms (20 FPS) for smoother game control
   const cachedDetectionsRef = useRef<faceapi.WithFaceExpressions<faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }, faceapi.FaceLandmarks68>>[]>([]);
+  const lastFaceYRef = useRef<number | null>(null);
 
   // Process frame for face detection with expressions
   const processFrame = useCallback(async () => {
@@ -226,7 +227,13 @@ export default function FaceDetection() {
           // Calculate normalized face Y position for game (0 = top, 1 = bottom)
           const videoHeight = video.videoHeight || 480;
           const faceCenterY = box.y + box.height / 2;
-          const normalizedY = Math.max(0, Math.min(1, faceCenterY / videoHeight));
+          let normalizedY = Math.max(0, Math.min(1, faceCenterY / videoHeight));
+          
+          // Interpolate for smoother game control
+          if (lastFaceYRef.current !== null) {
+            normalizedY = lastFaceYRef.current + (normalizedY - lastFaceYRef.current) * 0.4;
+          }
+          lastFaceYRef.current = normalizedY;
           setFaceYPosition(normalizedY);
         }
 
